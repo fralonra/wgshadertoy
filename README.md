@@ -4,6 +4,14 @@ A [WGSL](https://www.w3.org/TR/WGSL/) playground inspired by [Shadertoy](https:/
 
 <img src="https://i.ibb.co/GV2rwTj/Wg-Shadertoy-001.png" alt="preview">
 
+## Wgs format
+
+The application use a binary format `wgs` to save and load shaders and textures.
+
+It helps to share your shaders amoung people.
+
+You can find examples in [wgshader-examples](https://github.com/fralonra/wgshader-examples).
+
 ## Uniforms
 
 The runtime currently provided six parameters you can use in your shader as a uniform variable:
