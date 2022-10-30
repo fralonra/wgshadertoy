@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 #[derive(Debug)]
 pub enum UserEvent {
     ChangeTexture(usize),
@@ -8,5 +6,4 @@ pub enum UserEvent {
     OpenTexture,
     RequestRedraw,
     SaveFile,
-    SelectFile(PathBuf),
 }

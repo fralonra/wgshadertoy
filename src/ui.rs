@@ -142,21 +142,12 @@ impl Ui {
         queue: &Queue,
         window: &Window,
         edit_context: &mut EditContext,
-        shader_frag_path: &Option<PathBuf>,
-        presets: &Vec<PathBuf>,
         texture_addable: bool,
         event_proxy: &EventLoopProxy<UserEvent>,
     ) {
         let raw_input = self.state.take_egui_input(window);
         let full_output = self.context.run(raw_input, |ctx| {
-            self.ui(
-                ctx,
-                edit_context,
-                shader_frag_path,
-                presets,
-                texture_addable,
-                event_proxy,
-            );
+            self.ui(ctx, edit_context, texture_addable, event_proxy);
         });
 
         self.state
@@ -186,8 +177,6 @@ impl Ui {
         &self,
         ctx: &Context,
         edit_context: &mut EditContext,
-        shader_frag_path: &Option<PathBuf>,
-        presets: &Vec<PathBuf>,
         texture_addable: bool,
         event_proxy: &EventLoopProxy<UserEvent>,
     ) {
@@ -202,47 +191,6 @@ impl Ui {
         CentralPanel::default().show(ctx, |ui| {
             widgets::global_dark_light_mode_switch(ui);
             ui.horizontal(|ui| {
-                match shader_frag_path {
-                    Some(shader_frag_path) => {
-                        ComboBox::from_id_source("fragment")
-                            .selected_text(format_preset_label(shader_frag_path))
-                            .show_ui(ui, |ui| {
-                                for frag in presets {
-                                    let mut response = ui.selectable_label(
-                                        *shader_frag_path == *frag,
-                                        format_preset_label(frag),
-                                    );
-                                    if response.clicked() {
-                                        response.mark_changed();
-
-                                        event_proxy
-                                            .send_event(UserEvent::SelectFile(frag.to_path_buf()))
-                                            .unwrap();
-                                    }
-                                }
-                            });
-                    }
-                    None => {
-                        ComboBox::from_id_source("fragment")
-                            .selected_text(String::default())
-                            .show_ui(ui, |ui| {
-                                ui.selectable_label(false, String::default());
-
-                                for frag in presets {
-                                    let mut response =
-                                        ui.selectable_label(false, format_preset_label(frag));
-                                    if response.clicked() {
-                                        response.mark_changed();
-
-                                        event_proxy
-                                            .send_event(UserEvent::SelectFile(frag.to_path_buf()))
-                                            .unwrap();
-                                    }
-                                }
-                            });
-                    }
-                };
-
                 if ui.button("Compile").clicked() {
                     event_proxy.send_event(UserEvent::RequestRedraw).unwrap();
                 }

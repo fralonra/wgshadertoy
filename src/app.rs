@@ -29,10 +29,8 @@ pub struct App {
     cursor: [f32; 2],
     event_loop: EventLoop<UserEvent>,
     event_proxy: EventLoopProxy<UserEvent>,
-    presets: Vec<PathBuf>,
     runtime: Runtime,
     wgs_data: WgsData,
-    wgs_path: Option<PathBuf>,
     window: Window,
     ui: Ui,
     ui_edit_context: EditContext,
@@ -40,15 +38,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Result<Self, OsError> {
-        let (presets, wgs_path) = find_presets(Path::new("src/presets")).unwrap();
-        let wgs_data = match &wgs_path {
-            Some(path) => {
-                let buffer = read(path).unwrap();
-                let mut reader = Cursor::new(&buffer);
-                WgsData::load(&mut reader).unwrap()
-            }
-            None => default_wgs(),
-        };
+        let wgs_data = default_wgs();
 
         let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
         let event_proxy = event_loop.create_proxy();
@@ -105,10 +95,8 @@ impl App {
             cursor: Default::default(),
             event_loop,
             event_proxy,
-            presets,
             runtime,
             wgs_data,
-            wgs_path,
             window,
             ui,
             ui_edit_context,
@@ -148,8 +136,6 @@ impl App {
                             queue,
                             &self.window,
                             &mut self.ui_edit_context,
-                            &self.wgs_path,
-                            &self.presets,
                             texture_addable,
                             &self.event_proxy,
                         );
@@ -241,7 +227,6 @@ impl App {
                         }
                         UserEvent::NewFile => {
                             self.wgs_data = default_wgs();
-                            self.wgs_path = None;
                             self.ui.reset_textures();
                             self.ui_edit_context.frag = self.wgs_data.frag();
                             self.ui_edit_context.name = self.wgs_data.name();
@@ -254,7 +239,6 @@ impl App {
                                 match load_wgs(path.clone()) {
                                     Ok(wgs_data) => {
                                         self.wgs_data = wgs_data;
-                                        self.wgs_path = Some(path.clone());
 
                                         self.ui.reset_textures();
                                         for texture in self.wgs_data.textures_ref() {
@@ -274,10 +258,6 @@ impl App {
 
                                         self.ui_edit_context.frag = self.wgs_data.frag();
                                         self.ui_edit_context.name = self.wgs_data.name();
-
-                                        if !self.presets.contains(&path) {
-                                            self.presets.push(path);
-                                        }
 
                                         need_update = true;
                                     }
@@ -318,52 +298,19 @@ impl App {
                             self.wgs_data.set_frag(&self.ui_edit_context.frag);
                             self.wgs_data.set_name(&self.ui_edit_context.name);
 
-                            if self.wgs_path.is_none() {
-                                self.wgs_path = create_file(&format!(
-                                    "{}.{}",
-                                    self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
-                                    wgs::EXTENSION
-                                ));
-                            }
-                            if self.wgs_path.is_some() {
-                                let path = self.wgs_path.as_ref().unwrap();
-                                if !self.presets.contains(path) {
-                                    self.presets.push(path.to_path_buf());
+                            let path = create_file(&format!(
+                                "{}.{}",
+                                self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
+                                wgs::EXTENSION
+                            ));
+                            match path {
+                                Some(path) => {
+                                    self.wgs_data.set_frag(&self.ui_edit_context.frag);
+                                    save_wgs(path, &self.wgs_data);
                                 }
-                                self.wgs_data.set_frag(&self.ui_edit_context.frag);
-                                save_wgs(path.to_path_buf(), &self.wgs_data);
+                                None => {}
                             }
                         }
-                        UserEvent::SelectFile(path) => match load_wgs(path.clone()) {
-                            Ok(wgs_data) => {
-                                self.wgs_data = wgs_data;
-                                self.wgs_path = Some(path.clone());
-
-                                self.ui.reset_textures();
-                                for texture in self.wgs_data.textures_ref() {
-                                    self.runtime.add_texture(create_texture(
-                                        self.context.device_ref(),
-                                        self.context.queue_ref(),
-                                        texture.width,
-                                        texture.height,
-                                        &texture.data,
-                                    ));
-                                    self.ui.add_texture(
-                                        texture.width,
-                                        texture.height,
-                                        &texture.data,
-                                    );
-                                }
-
-                                self.ui_edit_context.frag = self.wgs_data.frag();
-                                self.ui_edit_context.name = self.wgs_data.name();
-
-                                need_update = true;
-                            }
-                            Err(err) => {
-                                log::error!("Failed to open file: {}", err);
-                            }
-                        },
                         _ => {}
                     }
 
