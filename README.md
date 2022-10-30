@@ -2,7 +2,7 @@
 
 A [WGSL](https://www.w3.org/TR/WGSL/) playground inspired by [Shadertoy](https://www.shadertoy.com/).
 
-<img src="https://i.ibb.co/mXb9rFP/winit-window-001.png" alt="preview">
+<img src="https://i.ibb.co/GV2rwTj/Wg-Shadertoy-001.png" alt="preview">
 
 ## Uniforms
 
