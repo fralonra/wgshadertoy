@@ -12,12 +12,10 @@ use wgpu::util::DeviceExt;
 pub const UNIFORM_GROUP_ID: u32 = 0;
 
 pub struct Runtime {
-    height: u32,
     pipeline: Option<wgpu::RenderPipeline>,
     shader_vert: String,
     texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
     time_instant: Instant,
-    width: u32,
     uniform: Uniform,
     uniform_bind_group: wgpu::BindGroup,
     uniform_bind_group_layout: wgpu::BindGroupLayout,
@@ -27,8 +25,6 @@ pub struct Runtime {
 
 impl Runtime {
     pub fn new(
-        width: u32,
-        height: u32,
         shader_frag: &str,
         shader_vert: &str,
         texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
@@ -54,12 +50,10 @@ impl Runtime {
         );
 
         Self {
-            height,
             pipeline,
             shader_vert: shader_vert.to_string(),
             texture_bind_groups,
             time_instant: Instant::now(),
-            width,
             uniform,
             uniform_bind_group,
             uniform_bind_group_layout,
@@ -131,9 +125,6 @@ impl Runtime {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.width = width;
-        self.height = height;
-
         self.uniform.resolution = [width as f32, height as f32];
     }
 
@@ -165,7 +156,7 @@ impl Runtime {
     }
 
     pub fn update_cursor(&mut self, cursor: [f32; 2]) {
-        self.uniform.cursor = [cursor[0], self.height as f32 - cursor[1]];
+        self.uniform.cursor = [cursor[0], self.uniform.resolution[1] - cursor[1]];
     }
 
     pub fn update_mouse_press(&mut self) {

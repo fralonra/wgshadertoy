@@ -63,8 +63,6 @@ impl App {
             .collect();
 
         let runtime = Runtime::new(
-            window_size.width / 2,
-            window_size.height,
             &concat_shader_frag(&wgs_data.frag(), wgs_data.textures_ref().len()),
             DEFAULT_VERTEX,
             texture_bind_groups,
