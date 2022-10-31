@@ -5,7 +5,7 @@ use crate::{
     runtime::{create_texture, Runtime},
     ui::{EditContext, Ui},
     viewport::Viewport,
-    wgs::{self, Texture, WgsData},
+    wgs::{self, WgsData},
 };
 use image::ImageResult;
 use std::{
@@ -65,7 +65,7 @@ impl App {
         let runtime = Runtime::new(
             window_size.width / 2,
             window_size.height,
-            &concat_shader_frag(&wgs_data.frag(), wgs_data.textures_ref()),
+            &concat_shader_frag(&wgs_data.frag(), wgs_data.textures_ref().len()),
             DEFAULT_VERTEX,
             texture_bind_groups,
             device,
@@ -333,7 +333,7 @@ impl App {
                             self.context.device_ref(),
                             &concat_shader_frag(
                                 &self.wgs_data.frag(),
-                                self.wgs_data.textures_ref(),
+                                self.wgs_data.textures_ref().len(),
                             ),
                             texture_bind_groups,
                             self.context.format(),
@@ -347,11 +347,11 @@ impl App {
     }
 }
 
-fn concat_shader_frag(main_image: &str, textures: &Vec<Texture>) -> String {
+fn concat_shader_frag(main_image: &str, texture_count: usize) -> String {
     let prefix = include_str!("assets/frag.prefix.wgsl");
 
     let mut texture2ds = String::new();
-    for (index, _) in textures.iter().enumerate() {
+    for index in 0..texture_count {
         texture2ds.push_str(&format!("@group({}) @binding(0)\n", index + 1,));
         texture2ds.push_str(&format!("var texture{}: texture_2d<f32>;\n", index));
         texture2ds.push_str(&format!("@group({}) @binding(1)\n", index + 1,));

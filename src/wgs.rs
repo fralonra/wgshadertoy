@@ -4,7 +4,7 @@ mod texture;
 use binrw::{binrw, BinRead, BinResult, BinWrite, NullString};
 use meta::Meta;
 use std::io;
-pub use texture::Texture;
+use texture::Texture;
 
 pub const DEFAULT_NAME: &'static str = "Untitled";
 pub const EXTENSION: &'static str = "wgs";
