@@ -2,7 +2,7 @@ use crate::{
     context::Context,
     event::UserEvent,
     fs::{create_file, select_file, select_texture, write_file},
-    runtime::{create_texture, Runtime},
+    runtime::Runtime,
     ui::{EditContext, Ui},
     viewport::Viewport,
     wgs::{self, WgsData},
@@ -54,19 +54,18 @@ impl App {
         let device = context.device_ref();
         let queue = context.queue_ref();
 
-        let texture_bind_groups = wgs_data
+        let textures = wgs_data
             .textures_ref()
             .iter()
-            .map(|texture| {
-                create_texture(device, queue, texture.width, texture.height, &texture.data)
-            })
+            .map(|texture| (texture.width, texture.height, &texture.data))
             .collect();
 
         let runtime = Runtime::new(
             &concat_shader_frag(&wgs_data.frag(), wgs_data.textures_ref().len()),
             DEFAULT_VERTEX,
-            texture_bind_groups,
+            textures,
             device,
+            queue,
             context.format(),
         );
 
@@ -202,13 +201,11 @@ impl App {
                                     Ok((width, height, data)) => {
                                         self.runtime.change_texture(
                                             index,
-                                            create_texture(
-                                                self.context.device_ref(),
-                                                self.context.queue_ref(),
-                                                width,
-                                                height,
-                                                &data,
-                                            ),
+                                            self.context.device_ref(),
+                                            self.context.queue_ref(),
+                                            width,
+                                            height,
+                                            &data,
                                         );
                                         self.ui.change_texture(index, width, height, &data);
                                         self.wgs_data.change_texture(index, width, height, data);
@@ -240,13 +237,13 @@ impl App {
 
                                         self.ui.reset_textures();
                                         for texture in self.wgs_data.textures_ref() {
-                                            self.runtime.add_texture(create_texture(
+                                            self.runtime.add_texture(
                                                 self.context.device_ref(),
                                                 self.context.queue_ref(),
                                                 texture.width,
                                                 texture.height,
                                                 &texture.data,
-                                            ));
+                                            );
                                             self.ui.add_texture(
                                                 texture.width,
                                                 texture.height,
@@ -272,13 +269,13 @@ impl App {
 
                                 match open_image(path) {
                                     Ok((width, height, data)) => {
-                                        self.runtime.add_texture(create_texture(
+                                        self.runtime.add_texture(
                                             self.context.device_ref(),
                                             self.context.queue_ref(),
                                             width,
                                             height,
                                             &data,
-                                        ));
+                                        );
                                         self.ui.add_texture(width, height, &data);
                                         self.wgs_data.add_texture(width, height, data);
                                     }
@@ -313,27 +310,20 @@ impl App {
                     }
 
                     if need_update {
-                        let texture_bind_groups = self
+                        let textures = self
                             .wgs_data
                             .textures_ref()
                             .iter()
-                            .map(|texture| {
-                                create_texture(
-                                    self.context.device_ref(),
-                                    self.context.queue_ref(),
-                                    texture.width,
-                                    texture.height,
-                                    &texture.data,
-                                )
-                            })
+                            .map(|texture| (texture.width, texture.height, &texture.data))
                             .collect();
                         self.runtime.update(
                             self.context.device_ref(),
+                            self.context.queue_ref(),
                             &concat_shader_frag(
                                 &self.wgs_data.frag(),
                                 self.wgs_data.textures_ref().len(),
                             ),
-                            texture_bind_groups,
+                            textures,
                             self.context.format(),
                         );
                         self.window.request_redraw();

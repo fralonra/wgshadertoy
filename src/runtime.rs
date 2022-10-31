@@ -13,6 +13,7 @@ pub const UNIFORM_GROUP_ID: u32 = 0;
 
 pub struct Runtime {
     pipeline: Option<wgpu::RenderPipeline>,
+    sampler: wgpu::Sampler,
     shader_vert: String,
     texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
     time_instant: Instant,
@@ -27,14 +28,23 @@ impl Runtime {
     pub fn new(
         shader_frag: &str,
         shader_vert: &str,
-        texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
+        textures: Vec<(u32, u32, &Vec<u8>)>,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         format: wgpu::TextureFormat,
     ) -> Self {
         let mut validator = Validator::new(ValidationFlags::all(), Capabilities::all());
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
 
         let (uniform, uniform_buffer, uniform_bind_group_layout, uniform_bind_group) =
             setup_uniform(device);
+
+        let texture_bind_groups = textures
+            .iter()
+            .map(|(width, height, data)| {
+                create_texture(device, queue, &sampler, *width, *height, &data)
+            })
+            .collect::<Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>>();
 
         let mut bind_group_layouts = vec![&uniform_bind_group_layout];
         for (layout, _) in &texture_bind_groups {
@@ -51,6 +61,7 @@ impl Runtime {
 
         Self {
             pipeline,
+            sampler,
             shader_vert: shader_vert.to_string(),
             texture_bind_groups,
             time_instant: Instant::now(),
@@ -62,16 +73,35 @@ impl Runtime {
         }
     }
 
-    pub fn add_texture(&mut self, texture: (wgpu::BindGroupLayout, wgpu::BindGroup)) {
-        self.texture_bind_groups.push(texture);
+    pub fn add_texture(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        buffer: &[u8],
+    ) {
+        self.texture_bind_groups.push(create_texture(
+            device,
+            queue,
+            &self.sampler,
+            width,
+            height,
+            buffer,
+        ));
     }
 
     pub fn change_texture(
         &mut self,
         index: usize,
-        texture: (wgpu::BindGroupLayout, wgpu::BindGroup),
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        buffer: &[u8],
     ) {
-        self.texture_bind_groups[index] = texture;
+        self.texture_bind_groups[index] =
+            create_texture(device, queue, &self.sampler, width, height, buffer);
     }
 
     pub fn remove_texture(&mut self, index: usize) {
@@ -131,14 +161,23 @@ impl Runtime {
     pub fn update(
         &mut self,
         device: &wgpu::Device,
+        queue: &wgpu::Queue,
         shader_frag: &str,
-        texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
+        textures: Vec<(u32, u32, &Vec<u8>)>,
         format: wgpu::TextureFormat,
     ) {
         self.time_instant = Instant::now();
 
+        let resolution = self.uniform.resolution;
         self.uniform = Uniform::default();
-        self.uniform.resolution = [self.width as f32, self.height as f32];
+        self.uniform.resolution = resolution;
+
+        let texture_bind_groups = textures
+            .iter()
+            .map(|(width, height, data)| {
+                create_texture(device, queue, &self.sampler, *width, *height, &data)
+            })
+            .collect();
 
         self.texture_bind_groups = texture_bind_groups;
         let mut bind_group_layouts = vec![&self.uniform_bind_group_layout];
@@ -170,9 +209,65 @@ impl Runtime {
     }
 }
 
-pub fn create_texture(
+fn build_pipeline(
+    shader_frag: &str,
+    shader_vert: &str,
+    bind_group_layouts: &[&wgpu::BindGroupLayout],
+    device: &wgpu::Device,
+    texture_format: wgpu::TextureFormat,
+    validator: &mut Validator,
+) -> Option<wgpu::RenderPipeline> {
+    match validate_wgsl(shader_frag, validator) {
+        Ok(()) => {
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Pipeline Layout"),
+                bind_group_layouts,
+                push_constant_ranges: &[],
+            });
+            let fs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Shader"),
+                source: wgpu::ShaderSource::Wgsl(Cow::from(shader_frag)),
+            });
+            let vs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Shader"),
+                source: wgpu::ShaderSource::Wgsl(Cow::from(shader_vert)),
+            });
+            let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Render Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &vs_module,
+                    entry_point: "main",
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &fs_module,
+                    entry_point: "main",
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: texture_format,
+                        blend: Some(wgpu::BlendState::REPLACE),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    front_face: wgpu::FrontFace::Ccw,
+                    ..Default::default()
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState::default(),
+                multiview: None,
+            });
+            Some(pipeline)
+        }
+        Err(()) => None,
+    }
+}
+
+fn create_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
+    sampler: &wgpu::Sampler,
     width: u32,
     height: u32,
     buffer: &[u8],
@@ -232,7 +327,6 @@ pub fn create_texture(
         });
 
     let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
 
     let texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         layout: &texture_bind_group_layout,
@@ -250,62 +344,6 @@ pub fn create_texture(
     });
 
     (texture_bind_group_layout, texture_bind_group)
-}
-
-fn build_pipeline(
-    shader_frag: &str,
-    shader_vert: &str,
-    bind_group_layouts: &[&wgpu::BindGroupLayout],
-    device: &wgpu::Device,
-    texture_format: wgpu::TextureFormat,
-    validator: &mut Validator,
-) -> Option<wgpu::RenderPipeline> {
-    log::info!("{:?}", shader_frag);
-    match validate_wgsl(shader_frag, validator) {
-        Ok(()) => {
-            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Pipeline Layout"),
-                bind_group_layouts,
-                push_constant_ranges: &[],
-            });
-            let fs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("Shader"),
-                source: wgpu::ShaderSource::Wgsl(Cow::from(shader_frag)),
-            });
-            let vs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("Shader"),
-                source: wgpu::ShaderSource::Wgsl(Cow::from(shader_vert)),
-            });
-            let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &vs_module,
-                    entry_point: "main",
-                    buffers: &[],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &fs_module,
-                    entry_point: "main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: texture_format,
-                        blend: Some(wgpu::BlendState::REPLACE),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    front_face: wgpu::FrontFace::Ccw,
-                    ..Default::default()
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview: None,
-            });
-            Some(pipeline)
-        }
-        Err(()) => None,
-    }
 }
 
 fn setup_uniform(
