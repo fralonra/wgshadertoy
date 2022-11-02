@@ -1,10 +1,13 @@
 mod highlight;
 mod image_upload;
 
-use crate::{event::UserEvent, viewport::Viewport};
+use crate::{
+    event::{AppStatus, UserEvent},
+    viewport::Viewport,
+};
 use egui::{
-    style::FontSelection, widgets, Align, CentralPanel, ClippedPrimitive, ColorImage, Context,
-    ImageData, Layout, ScrollArea, TextEdit, TextureFilter, TextureHandle,
+    style::FontSelection, widgets, Align, CentralPanel, ClippedPrimitive, Color32, ColorImage,
+    Context, ImageData, Layout, ScrollArea, TextEdit, TextureFilter, TextureHandle, TopBottomPanel,
 };
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit::State;
@@ -23,6 +26,7 @@ pub struct EditContext {
 }
 
 pub struct Ui {
+    app_status: Option<(AppStatus, String)>,
     clipped_primitives: Vec<ClippedPrimitive>,
     context: Context,
     highlighter: Highlighter,
@@ -53,6 +57,7 @@ impl Ui {
         state.set_pixels_per_point(scale_factor);
 
         Self {
+            app_status: None,
             clipped_primitives,
             context,
             highlighter: Highlighter::default(),
@@ -72,6 +77,10 @@ impl Ui {
             )),
             TextureFilter::Linear,
         ));
+    }
+
+    pub fn change_status(&mut self, status: Option<(AppStatus, String)>) {
+        self.app_status = status;
     }
 
     pub fn change_texture(&mut self, index: usize, width: u32, height: u32, data: &[u8]) {
@@ -186,6 +195,32 @@ impl Ui {
             layout_job.wrap.max_width = wrap_width;
             ui.fonts().layout_job(layout_job)
         };
+
+        let is_dark = ctx.style().visuals.dark_mode;
+        TopBottomPanel::bottom("status").show(ctx, |ui| match &self.app_status {
+            Some((status, message)) => {
+                match status {
+                    AppStatus::Info => ui.label(message),
+                    AppStatus::Warning => ui.colored_label(
+                        if is_dark {
+                            Color32::KHAKI
+                        } else {
+                            Color32::DARK_RED
+                        },
+                        message,
+                    ),
+                    AppStatus::Error => ui.colored_label(
+                        if is_dark {
+                            Color32::LIGHT_RED
+                        } else {
+                            Color32::DARK_RED
+                        },
+                        message,
+                    ),
+                };
+            }
+            None => {}
+        });
 
         CentralPanel::default().show(ctx, |ui| {
             widgets::global_dark_light_mode_switch(ui);

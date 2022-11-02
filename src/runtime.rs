@@ -1,6 +1,7 @@
 mod uniform;
 
 use crate::viewport::Viewport;
+use anyhow::{anyhow, Result};
 use naga::{
     front::wgsl,
     valid::{Capabilities, ValidationFlags, Validator},
@@ -12,7 +13,7 @@ use wgpu::util::DeviceExt;
 pub const UNIFORM_GROUP_ID: u32 = 0;
 
 pub struct Runtime {
-    pipeline: Option<wgpu::RenderPipeline>,
+    pipeline: wgpu::RenderPipeline,
     sampler: wgpu::Sampler,
     shader_vert: String,
     texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
@@ -32,7 +33,7 @@ impl Runtime {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         format: wgpu::TextureFormat,
-    ) -> Self {
+    ) -> Result<Self> {
         let mut validator = Validator::new(ValidationFlags::all(), Capabilities::all());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
 
@@ -57,9 +58,9 @@ impl Runtime {
             &device,
             format,
             &mut validator,
-        );
+        )?;
 
-        Self {
+        Ok(Self {
             pipeline,
             sampler,
             shader_vert: shader_vert.to_string(),
@@ -70,7 +71,7 @@ impl Runtime {
             uniform_bind_group_layout,
             uniform_buffer,
             validator,
-        }
+        })
     }
 
     pub fn add_texture(
@@ -140,11 +141,8 @@ impl Runtime {
             viewport.max_depth,
         );
 
-        if self.pipeline.is_none() {
-            return;
-        }
+        render_pass.set_pipeline(&self.pipeline);
 
-        render_pass.set_pipeline(&self.pipeline.as_ref().unwrap());
         render_pass.set_bind_group(UNIFORM_GROUP_ID, &self.uniform_bind_group, &[]);
         let mut index = 1;
         for (_, bind_group) in &self.texture_bind_groups {
@@ -165,7 +163,7 @@ impl Runtime {
         shader_frag: &str,
         textures: Vec<(u32, u32, &Vec<u8>)>,
         format: wgpu::TextureFormat,
-    ) {
+    ) -> Result<()> {
         self.time_instant = Instant::now();
 
         let resolution = self.uniform.resolution;
@@ -191,7 +189,9 @@ impl Runtime {
             device,
             format,
             &mut self.validator,
-        );
+        )?;
+
+        Ok(())
     }
 
     pub fn update_cursor(&mut self, cursor: [f32; 2]) {
@@ -216,52 +216,49 @@ fn build_pipeline(
     device: &wgpu::Device,
     texture_format: wgpu::TextureFormat,
     validator: &mut Validator,
-) -> Option<wgpu::RenderPipeline> {
-    match validate_wgsl(shader_frag, validator) {
-        Ok(()) => {
-            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Pipeline Layout"),
-                bind_group_layouts,
-                push_constant_ranges: &[],
-            });
-            let fs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("Shader"),
-                source: wgpu::ShaderSource::Wgsl(Cow::from(shader_frag)),
-            });
-            let vs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("Shader"),
-                source: wgpu::ShaderSource::Wgsl(Cow::from(shader_vert)),
-            });
-            let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some("Render Pipeline"),
-                layout: Some(&pipeline_layout),
-                vertex: wgpu::VertexState {
-                    module: &vs_module,
-                    entry_point: "main",
-                    buffers: &[],
-                },
-                fragment: Some(wgpu::FragmentState {
-                    module: &fs_module,
-                    entry_point: "main",
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: texture_format,
-                        blend: Some(wgpu::BlendState::REPLACE),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    front_face: wgpu::FrontFace::Ccw,
-                    ..Default::default()
-                },
-                depth_stencil: None,
-                multisample: wgpu::MultisampleState::default(),
-                multiview: None,
-            });
-            Some(pipeline)
-        }
-        Err(()) => None,
-    }
+) -> Result<wgpu::RenderPipeline> {
+    validate_wgsl(shader_frag, validator)?;
+
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("Pipeline Layout"),
+        bind_group_layouts,
+        push_constant_ranges: &[],
+    });
+    let fs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Shader"),
+        source: wgpu::ShaderSource::Wgsl(Cow::from(shader_frag)),
+    });
+    let vs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Shader"),
+        source: wgpu::ShaderSource::Wgsl(Cow::from(shader_vert)),
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Render Pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &vs_module,
+            entry_point: "main",
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &fs_module,
+            entry_point: "main",
+            targets: &[Some(wgpu::ColorTargetState {
+                format: texture_format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            front_face: wgpu::FrontFace::Ccw,
+            ..Default::default()
+        },
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+    });
+    Ok(pipeline)
 }
 
 fn create_texture(
@@ -394,18 +391,12 @@ fn setup_uniform(
     )
 }
 
-fn validate_wgsl(source: &str, validator: &mut Validator) -> Result<(), ()> {
+fn validate_wgsl(source: &str, validator: &mut Validator) -> Result<()> {
     match wgsl::parse_str(source) {
         Ok(module) => match validator.validate(&module) {
             Ok(_module_info) => Ok(()),
-            Err(err) => {
-                log::warn!("Validate Wgsl failed: {}", err);
-                Err(())
-            }
+            Err(err) => Err(anyhow!("Validate Wgsl failed: {}", err)),
         },
-        Err(err) => {
-            log::warn!("Parse Wgsl failed: {}", err);
-            Err(())
-        }
+        Err(err) => Err(anyhow!("Parse Wgsl failed: {}", err)),
     }
 }

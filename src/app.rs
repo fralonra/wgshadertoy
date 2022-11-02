@@ -1,21 +1,22 @@
 use crate::{
     context::Context,
-    event::UserEvent,
+    event::{AppStatus, UserEvent},
     fs::{create_file, select_file, select_texture, write_file},
     runtime::Runtime,
     ui::{EditContext, Ui},
     viewport::Viewport,
     wgs::{self, WgsData},
 };
+use anyhow::Result;
 use image::ImageResult;
 use std::{
     fs::read,
     io::{self, Cursor},
     path::PathBuf,
+    time::Instant,
 };
 use winit::{
     dpi::{PhysicalSize, Size},
-    error::OsError,
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
     window::{Window, WindowBuilder},
@@ -29,6 +30,7 @@ pub struct App {
     cursor: [f32; 2],
     event_loop: EventLoop<UserEvent>,
     event_proxy: EventLoopProxy<UserEvent>,
+    status_clock: Instant,
     runtime: Runtime,
     wgs_data: WgsData,
     wgs_path: Option<PathBuf>,
@@ -38,7 +40,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Result<Self, OsError> {
+    pub fn new() -> Result<Self> {
         let wgs_data = default_wgs();
 
         let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
@@ -68,7 +70,7 @@ impl App {
             device,
             queue,
             context.format(),
-        );
+        )?;
 
         let mut ui = Ui::new(
             context.device_ref(),
@@ -88,11 +90,19 @@ impl App {
             name: wgs_data.name(),
         };
 
+        event_proxy
+            .send_event(UserEvent::ChangeStatus(Some((
+                AppStatus::Info,
+                "Shader compiled successfully!".to_owned(),
+            ))))
+            .unwrap();
+
         Ok(Self {
             context,
             cursor: Default::default(),
             event_loop,
             event_proxy,
+            status_clock: Instant::now(),
             runtime,
             wgs_data,
             wgs_path: None,
@@ -108,44 +118,50 @@ impl App {
 
             match event {
                 Event::MainEventsCleared => self.window.request_redraw(),
-                Event::RedrawRequested(_) => match self.context.get_render_stuff() {
-                    Ok((mut encoder, frame, view)) => {
-                        let device = self.context.device_ref();
-                        let queue = self.context.queue_ref();
-
-                        let size = self.window.inner_size();
-                        let half_width = size.width as f32 / 2.0;
-                        let viewport = Viewport {
-                            x: half_width,
-                            width: half_width,
-                            height: size.height as f32,
-                            ..Default::default()
-                        };
-                        self.runtime.render(queue, &mut encoder, &view, &viewport);
-
-                        let viewport = Viewport {
-                            width: half_width,
-                            height: size.height as f32,
-                            ..Default::default()
-                        };
-                        let texture_addable = self.wgs_data.textures_ref().len() + 1
-                            < device.limits().max_bind_groups as usize;
-                        self.ui.prepare(
-                            device,
-                            queue,
-                            &self.window,
-                            &mut self.ui_edit_context,
-                            texture_addable,
-                            &self.event_proxy,
-                        );
-                        self.ui.draw(device, &mut encoder, queue, &view, &viewport);
-                        self.context.finish(encoder, frame);
+                Event::RedrawRequested(_) => {
+                    if self.status_clock.elapsed().as_secs() > 5 {
+                        self.ui.change_status(None);
                     }
-                    Err(err) => {
-                        log::warn!("Failed to get render stuff: {}", err);
-                        self.window.request_redraw();
+
+                    match self.context.get_render_stuff() {
+                        Ok((mut encoder, frame, view)) => {
+                            let device = self.context.device_ref();
+                            let queue = self.context.queue_ref();
+
+                            let size = self.window.inner_size();
+                            let half_width = size.width as f32 / 2.0;
+                            let viewport = Viewport {
+                                x: half_width,
+                                width: half_width,
+                                height: size.height as f32,
+                                ..Default::default()
+                            };
+                            self.runtime.render(queue, &mut encoder, &view, &viewport);
+
+                            let viewport = Viewport {
+                                width: half_width,
+                                height: size.height as f32,
+                                ..Default::default()
+                            };
+                            let texture_addable = self.wgs_data.textures_ref().len() + 1
+                                < device.limits().max_bind_groups as usize;
+                            self.ui.prepare(
+                                device,
+                                queue,
+                                &self.window,
+                                &mut self.ui_edit_context,
+                                texture_addable,
+                                &self.event_proxy,
+                            );
+                            self.ui.draw(device, &mut encoder, queue, &view, &viewport);
+                            self.context.finish(encoder, frame);
+                        }
+                        Err(err) => {
+                            log::warn!("Failed to get render stuff: {}", err);
+                            self.window.request_redraw();
+                        }
                     }
-                },
+                }
                 Event::WindowEvent {
                     ref event,
                     window_id,
@@ -194,6 +210,9 @@ impl App {
                     let mut need_update = false;
 
                     match event {
+                        UserEvent::ChangeStatus(status) => {
+                            self.ui.change_status(status);
+                        }
                         UserEvent::ChangeTexture(index) => {
                             let path = select_texture();
                             if path.is_some() {
@@ -312,6 +331,14 @@ impl App {
                             if self.wgs_path.is_some() {
                                 self.wgs_data.set_frag(&self.ui_edit_context.frag);
                                 save_wgs(&self.wgs_path.as_ref().unwrap(), &self.wgs_data);
+
+                                self.event_proxy
+                                    .send_event(UserEvent::ChangeStatus(Some((
+                                        AppStatus::Info,
+                                        "Shader saved successfully!".to_owned(),
+                                    ))))
+                                    .unwrap();
+                                self.status_clock = Instant::now();
                             }
                         }
                     }
@@ -323,7 +350,7 @@ impl App {
                             .iter()
                             .map(|texture| (texture.width, texture.height, &texture.data))
                             .collect();
-                        self.runtime.update(
+                        match self.runtime.update(
                             self.context.device_ref(),
                             self.context.queue_ref(),
                             &concat_shader_frag(
@@ -332,8 +359,28 @@ impl App {
                             ),
                             textures,
                             self.context.format(),
-                        );
-                        self.window.request_redraw();
+                        ) {
+                            Ok(()) => {
+                                self.event_proxy
+                                    .send_event(UserEvent::ChangeStatus(Some((
+                                        AppStatus::Info,
+                                        "Shader compiled successfully!".to_owned(),
+                                    ))))
+                                    .unwrap();
+                                self.status_clock = Instant::now();
+
+                                self.window.request_redraw();
+                            }
+                            Err(err) => {
+                                self.event_proxy
+                                    .send_event(UserEvent::ChangeStatus(Some((
+                                        AppStatus::Error,
+                                        err.to_string(),
+                                    ))))
+                                    .unwrap();
+                                self.status_clock = Instant::now();
+                            }
+                        }
                     }
                 }
                 _ => {}
