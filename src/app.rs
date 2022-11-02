@@ -31,6 +31,7 @@ pub struct App {
     event_proxy: EventLoopProxy<UserEvent>,
     runtime: Runtime,
     wgs_data: WgsData,
+    wgs_path: Option<PathBuf>,
     window: Window,
     ui: Ui,
     ui_edit_context: EditContext,
@@ -44,7 +45,7 @@ impl App {
         let event_proxy = event_loop.create_proxy();
 
         let window = WindowBuilder::new()
-            .with_title("WgShadertoy")
+            .with_title(format_title(&None))
             .with_min_inner_size(Size::Physical(PhysicalSize::new(720, 360)))
             .with_transparent(true)
             .build(&event_loop)?;
@@ -94,6 +95,7 @@ impl App {
             event_proxy,
             runtime,
             wgs_data,
+            wgs_path: None,
             window,
             ui,
             ui_edit_context,
@@ -222,9 +224,13 @@ impl App {
                         }
                         UserEvent::NewFile => {
                             self.wgs_data = default_wgs();
+                            self.wgs_path = None;
+                            self.window.set_title(&format_title(&self.wgs_path));
+
                             self.ui.reset_textures();
                             self.ui_edit_context.frag = self.wgs_data.frag();
                             self.ui_edit_context.name = self.wgs_data.name();
+
                             need_update = true;
                         }
                         UserEvent::OpenFile => {
@@ -234,6 +240,8 @@ impl App {
                                 match load_wgs(path.clone()) {
                                     Ok(wgs_data) => {
                                         self.wgs_data = wgs_data;
+                                        self.wgs_path = Some(path);
+                                        self.window.set_title(&format_title(&self.wgs_path));
 
                                         self.ui.reset_textures();
                                         for texture in self.wgs_data.textures_ref() {
@@ -293,17 +301,17 @@ impl App {
                             self.wgs_data.set_frag(&self.ui_edit_context.frag);
                             self.wgs_data.set_name(&self.ui_edit_context.name);
 
-                            let path = create_file(&format!(
-                                "{}.{}",
-                                self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
-                                wgs::EXTENSION
-                            ));
-                            match path {
-                                Some(path) => {
-                                    self.wgs_data.set_frag(&self.ui_edit_context.frag);
-                                    save_wgs(path, &self.wgs_data);
-                                }
-                                None => {}
+                            if self.wgs_path.is_none() {
+                                self.wgs_path = create_file(&format!(
+                                    "{}.{}",
+                                    self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
+                                    wgs::EXTENSION
+                                ));
+                                self.window.set_title(&format_title(&self.wgs_path));
+                            };
+                            if self.wgs_path.is_some() {
+                                self.wgs_data.set_frag(&self.ui_edit_context.frag);
+                                save_wgs(&self.wgs_path.as_ref().unwrap(), &self.wgs_data);
                             }
                         }
                     }
@@ -353,6 +361,16 @@ fn default_wgs() -> WgsData {
     WgsData::new(wgs::DEFAULT_NAME, DEFAULT_FRAGMENT)
 }
 
+fn format_title(file_path: &Option<PathBuf>) -> String {
+    format!(
+        "WgShadertoy - {}",
+        match file_path {
+            Some(file_path) => file_path.display().to_string(),
+            None => "Untitled".to_owned(),
+        }
+    )
+}
+
 fn load_wgs(path: PathBuf) -> io::Result<WgsData> {
     let buffer = read(path.clone())?;
     let mut reader = Cursor::new(&buffer);
@@ -374,7 +392,7 @@ fn open_image(path: PathBuf) -> ImageResult<(u32, u32, Vec<u8>)> {
     Ok((width, height, data))
 }
 
-fn save_wgs(path: PathBuf, wgs: &WgsData) {
+fn save_wgs(path: &PathBuf, wgs: &WgsData) {
     let mut writer = Cursor::new(vec![]);
     wgs.save(&mut writer).unwrap();
 
