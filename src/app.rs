@@ -9,9 +9,9 @@ use crate::{
 };
 use image::ImageResult;
 use std::{
-    fs::{read, read_dir},
+    fs::read,
     io::{self, Cursor},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use winit::{
     dpi::{PhysicalSize, Size},
@@ -306,7 +306,6 @@ impl App {
                                 None => {}
                             }
                         }
-                        _ => {}
                     }
 
                     if need_update {
@@ -352,37 +351,6 @@ fn concat_shader_frag(main_image: &str, texture_count: usize) -> String {
 
 fn default_wgs() -> WgsData {
     WgsData::new(wgs::DEFAULT_NAME, DEFAULT_FRAGMENT)
-}
-
-fn find_presets(path: &Path) -> io::Result<(Vec<PathBuf>, Option<PathBuf>)> {
-    let mut presets = vec![];
-    let mut default = None;
-
-    for entry in read_dir(path)? {
-        let entry = entry?;
-
-        let path = entry.path();
-        if path.is_file() {
-            match path.extension() {
-                Some(extension) => {
-                    if extension == wgs::EXTENSION {
-                        match path.file_stem() {
-                            Some(stem) => {
-                                if stem == "default" {
-                                    default = Some(path.clone());
-                                }
-                            }
-                            None => {}
-                        }
-                        presets.push(path);
-                    }
-                }
-                None => {}
-            }
-        }
-    }
-
-    Ok((presets, default))
 }
 
 fn load_wgs(path: PathBuf) -> io::Result<WgsData> {

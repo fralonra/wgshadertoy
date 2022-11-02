@@ -3,14 +3,13 @@ mod image_upload;
 
 use crate::{event::UserEvent, viewport::Viewport};
 use egui::{
-    style::FontSelection, widgets, Align, CentralPanel, ClippedPrimitive, ColorImage, ComboBox,
-    Context, ImageData, Layout, ScrollArea, TextEdit, TextureFilter, TextureHandle,
+    style::FontSelection, widgets, Align, CentralPanel, ClippedPrimitive, ColorImage, Context,
+    ImageData, Layout, ScrollArea, TextEdit, TextureFilter, TextureHandle,
 };
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit::State;
 use highlight::{CodeTheme, Highlighter};
 use image_upload::image_upload;
-use std::path::PathBuf;
 use wgpu::{CommandEncoder, Device, Queue, TextureFormat, TextureView};
 use winit::{
     event::WindowEvent,
@@ -249,13 +248,4 @@ impl Ui {
             });
         });
     }
-}
-
-fn format_preset_label(path: &PathBuf) -> String {
-    path.file_stem()
-        .unwrap_or_default()
-        .to_ascii_lowercase()
-        .to_str()
-        .unwrap_or("untitled")
-        .to_owned()
 }
