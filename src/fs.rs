@@ -1,30 +1,27 @@
 use crate::wgs;
-use native_dialog::FileDialog;
+use rfd::FileDialog;
 use std::{fs::write, path::PathBuf};
 
 pub fn create_file(filename: &str) -> Option<PathBuf> {
     FileDialog::new()
-        .set_location("~")
+        .set_directory("~")
         .add_filter("WebGPU Shader", &[wgs::EXTENSION])
-        .set_filename(filename)
-        .show_save_single_file()
-        .unwrap()
+        .set_file_name(filename)
+        .save_file()
 }
 
 pub fn select_file() -> Option<PathBuf> {
     FileDialog::new()
-        .set_location("~")
+        .set_directory("~")
         .add_filter("WebGPU Shader", &[wgs::EXTENSION])
-        .show_open_single_file()
-        .unwrap()
+        .pick_file()
 }
 
 pub fn select_texture() -> Option<PathBuf> {
     FileDialog::new()
-        .set_location("~")
+        .set_directory("~")
         .add_filter("Textures", &["png", "jpg"])
-        .show_open_single_file()
-        .unwrap()
+        .pick_file()
 }
 
 pub fn write_file<C: AsRef<[u8]>>(path: &PathBuf, contents: C) {
