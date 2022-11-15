@@ -45,9 +45,7 @@ impl Context {
             )
         });
 
-        // device.on_uncaptured_error(|err| {
-        //     log::error!("{}", err);
-        // });
+        device.push_error_scope(wgpu::ErrorFilter::Validation);
 
         let mut context = Self {
             device,

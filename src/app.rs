@@ -30,6 +30,7 @@ pub struct App {
     cursor: [f32; 2],
     event_loop: EventLoop<UserEvent>,
     event_proxy: EventLoopProxy<UserEvent>,
+    has_validation_error: bool,
     status_clock: Instant,
     runtime: Runtime,
     wgs_data: WgsData,
@@ -102,6 +103,7 @@ impl App {
             cursor: Default::default(),
             event_loop,
             event_proxy,
+            has_validation_error: false,
             status_clock: Instant::now(),
             runtime,
             wgs_data,
@@ -130,13 +132,37 @@ impl App {
 
                             let size = self.window.inner_size();
                             let half_width = size.width as f32 / 2.0;
-                            let viewport = Viewport {
-                                x: half_width,
-                                width: half_width,
-                                height: size.height as f32,
-                                ..Default::default()
-                            };
-                            self.runtime.render(queue, &mut encoder, &view, &viewport);
+
+                            futures::executor::block_on(async {
+                                match device.pop_error_scope().await {
+                                    Some(_error) => {
+                                        self.has_validation_error = true;
+                                        self.event_proxy
+                                            .send_event(UserEvent::ChangeStatus(Some((
+                                                AppStatus::Error,
+                                                "Shader validation error".to_string(),
+                                            ))))
+                                            .unwrap();
+                                        self.status_clock = Instant::now();
+                                    }
+                                    None => {
+                                        if !self.has_validation_error {
+                                            let viewport = Viewport {
+                                                x: half_width,
+                                                width: half_width,
+                                                height: size.height as f32,
+                                                ..Default::default()
+                                            };
+                                            self.runtime.render(
+                                                queue,
+                                                &mut encoder,
+                                                &view,
+                                                &viewport,
+                                            );
+                                        }
+                                    }
+                                }
+                            });
 
                             let viewport = Viewport {
                                 width: half_width,
@@ -154,7 +180,10 @@ impl App {
                                 &self.event_proxy,
                             );
                             self.ui.draw(device, &mut encoder, queue, &view, &viewport);
+
                             self.context.finish(encoder, frame);
+
+                            device.push_error_scope(wgpu::ErrorFilter::Validation);
                         }
                         Err(err) => {
                             log::warn!("Failed to get render stuff: {}", err);
@@ -344,6 +373,8 @@ impl App {
                     }
 
                     if need_update {
+                        self.has_validation_error = false;
+
                         let textures = self
                             .wgs_data
                             .textures_ref()

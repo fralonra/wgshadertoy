@@ -1,11 +1,7 @@
 mod uniform;
 
 use crate::viewport::Viewport;
-use anyhow::{anyhow, Result};
-use naga::{
-    front::wgsl,
-    valid::{Capabilities, ValidationFlags, Validator},
-};
+use anyhow::Result;
 use std::{borrow::Cow, time::Instant};
 use uniform::Uniform;
 use wgpu::util::DeviceExt;
@@ -22,7 +18,6 @@ pub struct Runtime {
     uniform_bind_group: wgpu::BindGroup,
     uniform_bind_group_layout: wgpu::BindGroupLayout,
     uniform_buffer: wgpu::Buffer,
-    validator: Validator,
 }
 
 impl Runtime {
@@ -34,7 +29,6 @@ impl Runtime {
         queue: &wgpu::Queue,
         format: wgpu::TextureFormat,
     ) -> Result<Self> {
-        let mut validator = Validator::new(ValidationFlags::all(), Capabilities::all());
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
 
         let (uniform, uniform_buffer, uniform_bind_group_layout, uniform_bind_group) =
@@ -57,7 +51,6 @@ impl Runtime {
             &bind_group_layouts,
             &device,
             format,
-            &mut validator,
         )?;
 
         Ok(Self {
@@ -70,7 +63,6 @@ impl Runtime {
             uniform_bind_group,
             uniform_bind_group_layout,
             uniform_buffer,
-            validator,
         })
     }
 
@@ -188,7 +180,6 @@ impl Runtime {
             &bind_group_layouts,
             device,
             format,
-            &mut self.validator,
         )?;
 
         Ok(())
@@ -215,10 +206,7 @@ fn build_pipeline(
     bind_group_layouts: &[&wgpu::BindGroupLayout],
     device: &wgpu::Device,
     texture_format: wgpu::TextureFormat,
-    validator: &mut Validator,
 ) -> Result<wgpu::RenderPipeline> {
-    validate_wgsl(shader_frag, validator)?;
-
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Pipeline Layout"),
         bind_group_layouts,
@@ -389,14 +377,4 @@ fn setup_uniform(
         uniform_bind_group_layout,
         uniform_bind_group,
     )
-}
-
-fn validate_wgsl(source: &str, validator: &mut Validator) -> Result<()> {
-    match wgsl::parse_str(source) {
-        Ok(module) => match validator.validate(&module) {
-            Ok(_module_info) => Ok(()),
-            Err(err) => Err(anyhow!("Validate Wgsl failed: {}", err)),
-        },
-        Err(err) => Err(anyhow!("Parse Wgsl failed: {}", err)),
-    }
 }
