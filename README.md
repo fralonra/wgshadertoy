@@ -44,7 +44,7 @@ fn main_image(frag_color: vec4<f32>, frag_coord: vec2<f32>) -> vec4<f32> {
 ## Limits
 
 - The amount of the texture you can upload is [the max bind group count of your device](https://docs.rs/wgpu/latest/wgpu/struct.Limits.html#structfield.max_bind_groups) - 1.
-- Invalid shader would panic! (See [here](https://github.com/fralonra/wgshadertoy/issues/1) for details)
+- Won't show any hints on invalid shaders. They just won't compile.
 
 ## Credits
 
