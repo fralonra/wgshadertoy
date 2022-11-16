@@ -1,3 +1,5 @@
+#[cfg(feature = "fps")]
+use crate::fps_counter::FpsCounter;
 use crate::{
     context::Context,
     event::{AppStatus, UserEvent},
@@ -30,6 +32,8 @@ pub struct App {
     cursor: [f32; 2],
     event_loop: EventLoop<UserEvent>,
     event_proxy: EventLoopProxy<UserEvent>,
+    #[cfg(feature = "fps")]
+    fps_counter: FpsCounter,
     has_validation_error: bool,
     status_clock: Instant,
     runtime: Runtime,
@@ -103,6 +107,8 @@ impl App {
             cursor: Default::default(),
             event_loop,
             event_proxy,
+            #[cfg(feature = "fps")]
+            fps_counter: FpsCounter::new(),
             has_validation_error: false,
             status_clock: Instant::now(),
             runtime,
@@ -190,6 +196,9 @@ impl App {
                             self.window.request_redraw();
                         }
                     }
+
+                    #[cfg(feature = "fps")]
+                    log::info!("FPS: {}", self.fps_counter.tick());
                 }
                 Event::WindowEvent {
                     ref event,

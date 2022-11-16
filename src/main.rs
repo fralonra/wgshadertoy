@@ -2,6 +2,8 @@ mod app;
 mod context;
 mod error;
 mod event;
+#[cfg(feature = "fps")]
+mod fps_counter;
 mod fs;
 mod runtime;
 mod ui;

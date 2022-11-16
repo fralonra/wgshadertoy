@@ -3,6 +3,9 @@ edition = "2021"
 name = "wgshadertoy"
 version = "0.1.0"
 
+[features]
+fps = []
+
 [dependencies]
 anyhow = "1.0"
 binrw = "0.10"
