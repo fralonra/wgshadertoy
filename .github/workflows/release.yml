@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies on Ubuntu
+        run: sudo apt-get update && sudo apt-get install libgtk-3-dev
+      - name: Build
+        run: cargo build --release
+      - name: Gzip
+        run: |
+          mkdir wgshadertoy
+          mv ./target/release/wgshadertoy wgshadertoy/
+          tar -zcvf ./wgshadertoy-linux.tar.gz wgshadertoy
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./wgshadertoy-linux.tar.gz
+
+  macos:
+    runs-on: macos-11
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install ARM target
+        run: rustup update && rustup target add aarch64-apple-darwin
+      - name: Build ARM
+        run: cargo build --release --target=aarch64-apple-darwin
+      - name: Make DMG
+        run: |
+          make dmg-universal
+          mv ./target/release/osx/WgShadertoy.dmg ./WgShadertoy.dmg
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./WgShadertoy.dmg
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --release
+      - name: Install WiX
+        run: nuget install WiX
+      - name: Create msi installer
+        run: |
+          ./WiX.*/tools/candle.exe -arch "x64" -ext WixUIExtension -ext WixUtilExtension \
+            -out "./wgshadertoy.wixobj" "extra/windows/wix/wgshadertoy.wxs"
+          ./WiX.*/tools/light.exe -ext WixUIExtension -ext WixUtilExtension \
+            -out "./wgshadertoy-windows.msi" -sice:ICE61 -sice:ICE91 \
+            "./wgshadertoy.wixobj"
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./wgshadertoy-windows.msi
