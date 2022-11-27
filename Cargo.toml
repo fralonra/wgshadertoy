@@ -9,14 +9,14 @@ fps = []
 [dependencies]
 anyhow = "1.0"
 binrw = "0.10"
-bytemuck = {version = "1.12", features = ["derive"]}
+bytemuck = { version = "1.12", features = ["derive"] }
 egui = "0.19"
 egui-winit = "0.19"
-egui_wgpu_backend = "0.19"
+egui_wgpu_backend = "0.20"
 env_logger = "0.9"
 futures = "0.3"
 image = "0.24"
 log = "0.4"
 rfd = "0.10"
-wgpu = "0.13"
+wgpu = "0.14"
 winit = "0.27"

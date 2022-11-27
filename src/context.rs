@@ -118,6 +118,7 @@ impl Context {
                 width,
                 height,
                 present_mode: wgpu::PresentMode::AutoVsync,
+                alpha_mode: wgpu::CompositeAlphaMode::Auto,
             },
         );
     }
