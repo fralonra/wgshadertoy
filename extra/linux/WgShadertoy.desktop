@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=WgShadertoy
+GenericName=WGSL playground
+Comment=A WGSL playground inspired by Shadertoy
+Icon=wgshadertoy
+Exec=wgshadertoy
+Terminal=false
+Categories=Graphics;2DGraphics;
