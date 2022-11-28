@@ -1,4 +1,8 @@
-# WgShadertoy
+<p align="center">
+    <img width="100" alt="WgShadertoy Logo" src="https://raw.githubusercontent.com/fralonra/wgshadertoy/master/extra/logo/wgshadertoy.svg">
+</p>
+
+<h1 align="center">WgShadertoy</h1>
 
 A [WGSL](https://www.w3.org/TR/WGSL/) playground inspired by [Shadertoy](https://www.shadertoy.com/).
 
@@ -41,10 +45,27 @@ fn main_image(frag_color: vec4<f32>, frag_coord: vec2<f32>) -> vec4<f32> {
 }
 ```
 
+## Installation
+
+Check the [latest release](https://github.com/fralonra/wgshadertoy/releases), and download the package for your specific OS.
+
+Currently, msi for Windows, dmg for MacOS and raw executable for Linux are provided. If you are willing to contribute more packages (such as deb, rpm...), feel free to open a PR.
+
+For Arch Linux users, there is already a package named `wgshadertoy` in AUR, just install it:
+
+```
+yay -S wgsahdertoy
+```
+
 ## Limits
 
 - The amount of the texture you can upload is [the max bind group count of your device](https://docs.rs/wgpu/latest/wgpu/struct.Limits.html#structfield.max_bind_groups) - 1.
 - Won't show any hints on invalid shaders. They just won't compile.
+
+## Todos
+
+- Web version
+- Advanced shader validation (detailed in https://github.com/fralonra/wgshadertoy/issues/1)
 
 ## Credits
 
