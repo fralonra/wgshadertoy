@@ -54,7 +54,7 @@ Currently, msi for Windows, dmg for MacOS and raw executable for Linux are provi
 For Arch Linux users, there is already a package named `wgshadertoy` in AUR, just install it:
 
 ```
-yay -S wgsahdertoy
+yay -S wgshadertoy
 ```
 
 ## Limits
