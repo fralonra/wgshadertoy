@@ -50,7 +50,7 @@ jobs:
       - name: Build
         run: cargo build --release
       - name: Install WiX
-        run: nuget install WiX
+        run: nuget install WiX -Version 3.11.2
       - name: Create msi installer
         run: |
           ./WiX.*/tools/candle.exe -arch "x64" -ext WixUIExtension -ext WixUtilExtension \
