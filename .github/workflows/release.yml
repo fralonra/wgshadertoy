@@ -7,6 +7,9 @@ on:
 jobs:
   linux:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies on Ubuntu
@@ -25,6 +28,9 @@ jobs:
 
   macos:
     runs-on: macos-11
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v3
       - name: Install ARM target
@@ -45,6 +51,9 @@ jobs:
     defaults:
       run:
         shell: bash
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v3
       - name: Build
