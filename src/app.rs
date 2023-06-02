@@ -21,7 +21,7 @@ use winit::{
     dpi::{PhysicalSize, Size},
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
-    window::{Window, WindowBuilder},
+    window::{Icon, Window, WindowBuilder},
 };
 
 const DEFAULT_FRAGMENT: &'static str = include_str!("assets/frag.default.wgsl");
@@ -52,9 +52,10 @@ impl App {
         let event_proxy = event_loop.create_proxy();
 
         let window = WindowBuilder::new()
-            .with_title(format_title(&None))
             .with_min_inner_size(Size::Physical(PhysicalSize::new(720, 360)))
+            .with_title(format_title(&None))
             .with_transparent(true)
+            .with_window_icon(window_icon())
             .build(&event_loop)?;
         let window_size = window.inner_size();
         let context = Context::new(&window, window_size.width, window_size.height);
@@ -486,4 +487,33 @@ fn save_wgs(path: &PathBuf, wgs: &WgsData) {
     write_file(&path, writer.into_inner());
 
     log::info!("Saving wgs file: {:?}", path);
+}
+
+#[cfg(target_os = "macos")]
+fn window_icon() -> Option<Icon> {
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn window_icon() -> Option<Icon> {
+    match window_icon_from_memory(include_bytes!("../extra/windows/wgshadertoy.ico")) {
+        Ok(icon) => Some(icon),
+        Err(err) => {
+            log::warn!("Failed to load window icon: {}", err);
+            None
+        }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn window_icon_from_memory(raw: &[u8]) -> Result<Icon> {
+    let image = image::load_from_memory(raw)?;
+
+    let image = image.into_rgba8();
+
+    let (width, height) = image.dimensions();
+
+    let icon = Icon::from_rgba(image.into_raw(), width, height)?;
+
+    Ok(icon)
 }
