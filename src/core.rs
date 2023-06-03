@@ -52,7 +52,6 @@ impl Core {
         let window = WindowBuilder::new()
             .with_min_inner_size(Size::Physical(PhysicalSize::new(720, 360)))
             .with_title(format_title(&None))
-            .with_transparent(true)
             .with_window_icon(window_icon())
             .build(&event_loop)?;
 
