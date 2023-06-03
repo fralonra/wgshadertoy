@@ -1,7 +1,6 @@
 #[cfg(feature = "fps")]
 use crate::fps_counter::FpsCounter;
 use crate::{
-    context::Context,
     event::{AppStatus, UserEvent},
     fs::{create_file, select_file, select_texture, write_file},
     runtime::Runtime,
@@ -10,6 +9,7 @@ use crate::{
     wgs::{self, WgsData},
 };
 use anyhow::Result;
+use egui_winit::State;
 use image::ImageResult;
 use std::{
     fs::read,
@@ -17,20 +17,19 @@ use std::{
     path::PathBuf,
     time::Instant,
 };
+use wgpu::SurfaceError;
 use winit::{
     dpi::{PhysicalSize, Size},
     event::{ElementState, Event, MouseButton, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
     window::{Icon, Window, WindowBuilder},
 };
 
 const DEFAULT_FRAGMENT: &'static str = include_str!("assets/frag.default.wgsl");
 const DEFAULT_VERTEX: &'static str = include_str!("assets/vert.wgsl");
 
-pub struct App {
-    context: Context,
+pub struct Core {
     cursor: [f32; 2],
-    event_loop: EventLoop<UserEvent>,
     event_proxy: EventLoopProxy<UserEvent>,
     #[cfg(feature = "fps")]
     fps_counter: FpsCounter,
@@ -44,11 +43,10 @@ pub struct App {
     ui_edit_context: EditContext,
 }
 
-impl App {
-    pub fn new() -> Result<Self> {
+impl Core {
+    pub fn new(event_loop: &EventLoop<UserEvent>) -> Result<Self> {
         let wgs_data = default_wgs();
 
-        let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
         let event_proxy = event_loop.create_proxy();
 
         let window = WindowBuilder::new()
@@ -57,11 +55,6 @@ impl App {
             .with_transparent(true)
             .with_window_icon(window_icon())
             .build(&event_loop)?;
-        let window_size = window.inner_size();
-        let context = Context::new(&window, window_size.width, window_size.height);
-
-        let device = context.device_ref();
-        let queue = context.queue_ref();
 
         let textures = wgs_data
             .textures_ref()
@@ -70,22 +63,16 @@ impl App {
             .collect();
 
         let runtime = Runtime::new(
+            &window,
             &concat_shader_frag(&wgs_data.frag(), wgs_data.textures_ref().len()),
             DEFAULT_VERTEX,
             textures,
-            device,
-            queue,
-            context.format(),
         )?;
 
-        let mut ui = Ui::new(
-            context.device_ref(),
-            &event_loop,
-            context.format(),
-            window_size.width / 2,
-            window_size.height,
-            window.scale_factor() as f32,
-        );
+        let mut state = State::new(&event_loop);
+        state.set_pixels_per_point(window.scale_factor() as f32);
+
+        let mut ui = Ui::new(state);
 
         for texture in wgs_data.textures_ref() {
             ui.add_texture(texture.width, texture.height, &texture.data);
@@ -104,9 +91,7 @@ impl App {
             .unwrap();
 
         Ok(Self {
-            context,
             cursor: Default::default(),
-            event_loop,
             event_proxy,
             #[cfg(feature = "fps")]
             fps_counter: FpsCounter::new(),
@@ -121,8 +106,8 @@ impl App {
         })
     }
 
-    pub fn run(mut self) {
-        self.event_loop.run(move |event, _, control_flow| {
+    pub fn run(mut self, event_loop: EventLoop<UserEvent>) {
+        event_loop.run(move |event, _, control_flow| {
             *control_flow = ControlFlow::Poll;
 
             match event {
@@ -132,69 +117,26 @@ impl App {
                         self.ui.change_status(None);
                     }
 
-                    match self.context.get_render_stuff() {
-                        Ok((mut encoder, frame, view)) => {
-                            let device = self.context.device_ref();
-                            let queue = self.context.queue_ref();
+                    if self.runtime.pop_error_scope().is_some() {
+                        self.has_validation_error = true;
+                        self.event_proxy
+                            .send_event(UserEvent::ChangeStatus(Some((
+                                AppStatus::Error,
+                                "Shader validation error".to_string(),
+                            ))))
+                            .unwrap();
+                        self.status_clock = Instant::now();
+                    }
 
-                            let size = self.window.inner_size();
-                            let half_width = size.width as f32 / 2.0;
-
-                            futures::executor::block_on(async {
-                                match device.pop_error_scope().await {
-                                    Some(_error) => {
-                                        self.has_validation_error = true;
-                                        self.event_proxy
-                                            .send_event(UserEvent::ChangeStatus(Some((
-                                                AppStatus::Error,
-                                                "Shader validation error".to_string(),
-                                            ))))
-                                            .unwrap();
-                                        self.status_clock = Instant::now();
-                                    }
-                                    None => {
-                                        if !self.has_validation_error {
-                                            let viewport = Viewport {
-                                                x: half_width,
-                                                width: half_width,
-                                                height: size.height as f32,
-                                                ..Default::default()
-                                            };
-                                            self.runtime.render(
-                                                queue,
-                                                &mut encoder,
-                                                &view,
-                                                &viewport,
-                                            );
-                                        }
-                                    }
-                                }
-                            });
-
-                            let viewport = Viewport {
-                                width: half_width,
-                                height: size.height as f32,
-                                ..Default::default()
-                            };
-                            let texture_addable = self.wgs_data.textures_ref().len() + 1
-                                < device.limits().max_bind_groups as usize;
-                            self.ui.prepare(
-                                device,
-                                queue,
-                                &self.window,
-                                &mut self.ui_edit_context,
-                                texture_addable,
-                                &self.event_proxy,
-                            );
-                            self.ui.draw(device, &mut encoder, queue, &view, &viewport);
-
-                            self.context.finish(encoder, frame);
-
-                            device.push_error_scope(wgpu::ErrorFilter::Validation);
-                        }
-                        Err(err) => {
-                            log::warn!("Failed to get render stuff: {}", err);
-                            self.window.request_redraw();
+                    if let Err(error) = self.render() {
+                        match error.downcast_ref::<SurfaceError>() {
+                            Some(SurfaceError::OutOfMemory) => {
+                                panic!("Swapchain error: {}. Rendering cannot continue.", error)
+                            }
+                            Some(_) | None => {
+                                log::warn!("Failed to render: {}", error);
+                                self.window.request_redraw();
+                            }
                         }
                     }
 
@@ -234,12 +176,8 @@ impl App {
                             _ => {}
                         },
                         WindowEvent::Resized(physical_size) => {
-                            self.context
-                                .resize(physical_size.width, physical_size.height);
                             self.runtime
-                                .resize(physical_size.width / 2, physical_size.height);
-                            self.ui
-                                .resize(physical_size.width / 2, physical_size.height);
+                                .resize(physical_size.width, physical_size.height);
                             self.window.request_redraw();
                         }
                         _ => {}
@@ -259,14 +197,7 @@ impl App {
 
                                 match open_image(path) {
                                     Ok((width, height, data)) => {
-                                        self.runtime.change_texture(
-                                            index,
-                                            self.context.device_ref(),
-                                            self.context.queue_ref(),
-                                            width,
-                                            height,
-                                            &data,
-                                        );
+                                        self.runtime.change_texture(index, width, height, &data);
                                         self.ui.change_texture(index, width, height, &data);
                                         self.wgs_data.change_texture(index, width, height, data);
                                     }
@@ -304,8 +235,6 @@ impl App {
                                         self.ui.reset_textures();
                                         for texture in self.wgs_data.textures_ref() {
                                             self.runtime.add_texture(
-                                                self.context.device_ref(),
-                                                self.context.queue_ref(),
                                                 texture.width,
                                                 texture.height,
                                                 &texture.data,
@@ -335,13 +264,7 @@ impl App {
 
                                 match open_image(path) {
                                     Ok((width, height, data)) => {
-                                        self.runtime.add_texture(
-                                            self.context.device_ref(),
-                                            self.context.queue_ref(),
-                                            width,
-                                            height,
-                                            &data,
-                                        );
+                                        self.runtime.add_texture(width, height, &data);
                                         self.ui.add_texture(width, height, &data);
                                         self.wgs_data.add_texture(width, height, data);
                                     }
@@ -392,14 +315,11 @@ impl App {
                             .map(|texture| (texture.width, texture.height, &texture.data))
                             .collect();
                         match self.runtime.update(
-                            self.context.device_ref(),
-                            self.context.queue_ref(),
                             &concat_shader_frag(
                                 &self.wgs_data.frag(),
                                 self.wgs_data.textures_ref().len(),
                             ),
                             textures,
-                            self.context.format(),
                         ) {
                             Ok(()) => {
                                 self.event_proxy
@@ -427,6 +347,52 @@ impl App {
                 _ => {}
             }
         });
+    }
+
+    fn render(&mut self) -> Result<()> {
+        let size = self.window.inner_size();
+        let half_width = size.width as f32 / 2.0;
+
+        let (surface_texture, texture_view) = self.runtime.get_surface()?;
+
+        if !self.has_validation_error {
+            let viewport = Viewport {
+                x: half_width,
+                width: half_width,
+                height: size.height as f32,
+                ..Default::default()
+            };
+            self.runtime.render(&texture_view, &viewport)?;
+        }
+
+        {
+            let texture_addable =
+                self.wgs_data.textures_ref().len() + 1 < self.runtime.max_texture_count() as usize;
+
+            let (clipped_primitives, textures_delta) = self.ui.prepare(
+                &self.window,
+                &mut self.ui_edit_context,
+                texture_addable,
+                &self.event_proxy,
+            );
+
+            let viewport = Viewport {
+                width: half_width,
+                height: size.height as f32,
+                ..Default::default()
+            };
+            self.runtime.render_ui(
+                &texture_view,
+                &clipped_primitives,
+                &textures_delta,
+                &viewport,
+                self.window.scale_factor() as f32,
+            )?;
+        }
+
+        surface_texture.present();
+
+        Ok(())
     }
 }
 

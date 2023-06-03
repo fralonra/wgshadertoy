@@ -1,24 +1,16 @@
 mod highlight;
 mod image_upload;
 
-use crate::{
-    event::{AppStatus, UserEvent},
-    viewport::Viewport,
-};
+use crate::event::{AppStatus, UserEvent};
 use egui::{
     style::FontSelection, widgets, Align, CentralPanel, ClippedPrimitive, Color32, ColorImage,
-    Context, ImageData, Layout, ScrollArea, TextEdit, TextureFilter, TextureHandle, TopBottomPanel,
+    Context, ImageData, Layout, ScrollArea, TextEdit, TextureFilter, TextureHandle, TexturesDelta,
+    TopBottomPanel,
 };
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit::State;
 use highlight::{CodeTheme, Highlighter};
 use image_upload::image_upload;
-use wgpu::{CommandEncoder, Device, Queue, TextureFormat, TextureView};
-use winit::{
-    event::WindowEvent,
-    event_loop::{EventLoopProxy, EventLoopWindowTarget},
-    window::Window,
-};
+use winit::{event::WindowEvent, event_loop::EventLoopProxy, window::Window};
 
 pub struct EditContext {
     pub frag: String,
@@ -27,42 +19,20 @@ pub struct EditContext {
 
 pub struct Ui {
     app_status: Option<(AppStatus, String)>,
-    clipped_primitives: Vec<ClippedPrimitive>,
     context: Context,
     highlighter: Highlighter,
-    render_pass: RenderPass,
-    screen_descriptor: ScreenDescriptor,
     state: State,
     textures: Vec<TextureHandle>,
 }
 
 impl Ui {
-    pub fn new(
-        device: &Device,
-        event_loop: &EventLoopWindowTarget<UserEvent>,
-        format: TextureFormat,
-        width: u32,
-        height: u32,
-        scale_factor: f32,
-    ) -> Self {
-        let clipped_primitives = Vec::new();
+    pub fn new(state: State) -> Self {
         let context = egui::Context::default();
-        let render_pass = RenderPass::new(device, format, 1);
-        let screen_descriptor = ScreenDescriptor {
-            physical_width: width,
-            physical_height: height,
-            scale_factor,
-        };
-        let mut state = State::new(event_loop);
-        state.set_pixels_per_point(scale_factor);
 
         Self {
             app_status: None,
-            clipped_primitives,
             context,
             highlighter: Highlighter::default(),
-            render_pass,
-            screen_descriptor,
             state,
             textures: vec![],
         }
@@ -94,66 +64,19 @@ impl Ui {
         );
     }
 
-    pub fn draw(
-        &mut self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        queue: &Queue,
-        view: &TextureView,
-        viewport: &Viewport,
-    ) {
-        self.render_pass.update_buffers(
-            device,
-            queue,
-            &self.clipped_primitives,
-            &self.screen_descriptor,
-        );
-
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Egui Main Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: None,
-        });
-
-        render_pass.set_viewport(
-            viewport.x,
-            viewport.y,
-            viewport.width,
-            viewport.height,
-            viewport.min_depth,
-            viewport.max_depth,
-        );
-
-        self.render_pass
-            .execute_with_renderpass(
-                &mut render_pass,
-                &self.clipped_primitives,
-                &self.screen_descriptor,
-            )
-            .unwrap();
-    }
-
     pub fn handle_event(&mut self, event: &WindowEvent) {
         self.state.on_event(&self.context, event);
     }
 
     pub fn prepare(
         &mut self,
-        device: &Device,
-        queue: &Queue,
         window: &Window,
         edit_context: &mut EditContext,
         texture_addable: bool,
         event_proxy: &EventLoopProxy<UserEvent>,
-    ) {
+    ) -> (Vec<ClippedPrimitive>, TexturesDelta) {
         let raw_input = self.state.take_egui_input(window);
+
         let full_output = self.context.run(raw_input, |ctx| {
             self.ui(ctx, edit_context, texture_addable, event_proxy);
         });
@@ -161,20 +84,13 @@ impl Ui {
         self.state
             .handle_platform_output(window, &self.context, full_output.platform_output);
 
-        self.clipped_primitives = self.context.tessellate(full_output.shapes);
+        let clipped_primitives = self.context.tessellate(full_output.shapes);
 
-        self.render_pass
-            .add_textures(device, queue, &full_output.textures_delta)
-            .unwrap();
+        (clipped_primitives, full_output.textures_delta)
     }
 
     pub fn remove_texture(&mut self, index: usize) {
         self.textures.remove(index);
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.screen_descriptor.physical_width = width;
-        self.screen_descriptor.physical_height = height;
     }
 
     pub fn reset_textures(&mut self) {
