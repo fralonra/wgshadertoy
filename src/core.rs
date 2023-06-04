@@ -1,7 +1,7 @@
 #[cfg(feature = "fps")]
 use crate::fps_counter::FpsCounter;
 use crate::{
-    event::{AppResponse, AppStatus, EventProxy, EventProxyWinit, UserEvent},
+    event::{AppResponse, AppStatus, EventProxyWinit, UserEvent},
     fs::{create_file, select_file, select_texture, write_file},
     runtime::Runtime,
     ui::{EditContext, Ui, UiState},
@@ -33,6 +33,7 @@ pub struct Core {
     runtime: Runtime,
     size: (f32, f32),
     state: State,
+    status: AppStatus,
     status_clock: Instant,
     wgs_data: WgsData,
     wgs_path: Option<PathBuf>,
@@ -85,10 +86,8 @@ impl Core {
 
         let event_proxy = event_loop.create_proxy();
         let event_proxy = EventProxyWinit::from_proxy(event_proxy);
-        event_proxy.send_event(UserEvent::ChangeStatus(Some((
-            AppStatus::Info,
-            "Shader compiled successfully!".to_owned(),
-        ))));
+
+        let initial_status = AppStatus::Info("Shader compiled successfully!".to_owned());
 
         Ok(Self {
             cursor: Default::default(),
@@ -99,6 +98,7 @@ impl Core {
             runtime,
             size: (width, height),
             state,
+            status: initial_status,
             status_clock: Instant::now(),
             wgs_data,
             wgs_path: None,
@@ -124,9 +124,6 @@ impl Core {
         let mut need_update = false;
 
         match event {
-            UserEvent::ChangeStatus(status) => {
-                self.ui.change_status(status);
-            }
             UserEvent::ChangeTexture(index) => {
                 let path = select_texture();
                 if path.is_some() {
@@ -240,20 +237,12 @@ impl Core {
                 textures,
             ) {
                 Ok(()) => {
-                    self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
-                        AppStatus::Info,
-                        "Shader compiled successfully!".to_owned(),
-                    ))));
-                    self.status_clock = Instant::now();
+                    self.change_status(AppStatus::Info("Shader compiled successfully!".to_owned()));
 
                     response.request_redraw = true;
                 }
                 Err(err) => {
-                    self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
-                        AppStatus::Error,
-                        err.to_string(),
-                    ))));
-                    self.status_clock = Instant::now();
+                    self.change_status(AppStatus::Error(err.to_string()));
                 }
             }
         }
@@ -269,16 +258,13 @@ impl Core {
         let mut request_redraw = false;
 
         if self.status_clock.elapsed().as_secs() > 5 {
-            self.ui.change_status(None);
+            self.status = AppStatus::Idle;
         }
 
         if self.runtime.pop_error_scope().is_some() {
             self.has_validation_error = true;
-            self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
-                AppStatus::Error,
-                "Shader validation error".to_string(),
-            ))));
-            self.status_clock = Instant::now();
+
+            self.change_status(AppStatus::Error("Shader validation error".to_string()));
         }
 
         if let Err(error) = self.render(window) {
@@ -314,6 +300,12 @@ impl Core {
         }
     }
 
+    fn change_status(&mut self, status: AppStatus) {
+        self.status = status;
+
+        self.status_clock = Instant::now();
+    }
+
     fn render(&mut self, window: &Window) -> Result<()> {
         let half_width = self.size.0 / 2.0;
 
@@ -336,6 +328,7 @@ impl Core {
 
             let ui_state = UiState {
                 file_saved,
+                status: self.status.clone(),
                 texture_addable,
             };
 
@@ -463,11 +456,7 @@ impl Core {
             self.wgs_data.set_frag(&self.ui_edit_context.frag);
             save_wgs(&self.wgs_path.as_ref().unwrap(), &self.wgs_data);
 
-            self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
-                AppStatus::Info,
-                "Shader saved successfully!".to_owned(),
-            ))));
-            self.status_clock = Instant::now();
+            self.change_status(AppStatus::Info("Shader saved successfully!".to_owned()));
 
             Some(format_title(&self.wgs_path))
         } else {

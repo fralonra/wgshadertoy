@@ -16,7 +16,6 @@ pub struct EditContext {
 }
 
 pub struct Ui {
-    app_status: Option<(AppStatus, String)>,
     context: Context,
     highlighter: Highlighter,
     textures: Vec<TextureHandle>,
@@ -27,7 +26,6 @@ impl Ui {
         let context = egui::Context::default();
 
         Self {
-            app_status: None,
             context,
             highlighter: Highlighter::default(),
             textures: vec![],
@@ -43,10 +41,6 @@ impl Ui {
             )),
             TextureFilter::Linear,
         ));
-    }
-
-    pub fn change_status(&mut self, status: Option<(AppStatus, String)>) {
-        self.app_status = status;
     }
 
     pub fn change_texture(&mut self, index: usize, width: u32, height: u32, data: &[u8]) {
@@ -101,29 +95,31 @@ impl Ui {
         };
 
         let is_dark = ctx.style().visuals.dark_mode;
-        TopBottomPanel::bottom("status").show(ctx, |ui| match &self.app_status {
-            Some((status, message)) => {
-                match status {
-                    AppStatus::Info => ui.label(message),
-                    AppStatus::Warning => ui.colored_label(
-                        if is_dark {
-                            Color32::KHAKI
-                        } else {
-                            Color32::DARK_RED
-                        },
-                        message,
-                    ),
-                    AppStatus::Error => ui.colored_label(
-                        if is_dark {
-                            Color32::LIGHT_RED
-                        } else {
-                            Color32::DARK_RED
-                        },
-                        message,
-                    ),
-                };
+        TopBottomPanel::bottom("status").show(ctx, |ui| match state.status {
+            AppStatus::Info(message) => {
+                ui.label(message);
             }
-            None => {}
+            AppStatus::Warning(message) => {
+                ui.colored_label(
+                    if is_dark {
+                        Color32::KHAKI
+                    } else {
+                        Color32::DARK_RED
+                    },
+                    message,
+                );
+            }
+            AppStatus::Error(message) => {
+                ui.colored_label(
+                    if is_dark {
+                        Color32::LIGHT_RED
+                    } else {
+                        Color32::DARK_RED
+                    },
+                    message,
+                );
+            }
+            _ => {}
         });
 
         CentralPanel::default().show(ctx, |ui| {
@@ -203,5 +199,6 @@ impl Ui {
 
 pub struct UiState {
     pub file_saved: bool,
+    pub status: AppStatus,
     pub texture_addable: bool,
 }

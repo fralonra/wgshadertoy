@@ -1,16 +1,16 @@
 use winit::event_loop::EventLoopProxy;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AppStatus {
-    Info,
-    Warning,
-    Error,
+    Idle,
+    Info(String),
+    Warning(String),
+    Error(String),
 }
 
 #[derive(Debug)]
 pub enum UserEvent {
     ChangeTexture(usize),
-    ChangeStatus(Option<(AppStatus, String)>),
     NewFile,
     OpenFile,
     OpenTexture,
