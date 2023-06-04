@@ -3,8 +3,8 @@ mod image_upload;
 
 use crate::event::{AppStatus, EventProxy, UserEvent};
 use egui::{
-    style::FontSelection, widgets, Align, CentralPanel, Color32, ColorImage, Context, FullOutput,
-    ImageData, Layout, RawInput, ScrollArea, TextEdit, TextureFilter, TextureHandle,
+    style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
+    FullOutput, ImageData, Layout, RawInput, ScrollArea, TextEdit, TextureFilter, TextureHandle,
     TopBottomPanel,
 };
 use highlight::{CodeTheme, Highlighter};
@@ -68,11 +68,11 @@ impl Ui {
         &mut self,
         raw_input: RawInput,
         edit_context: &mut EditContext,
-        texture_addable: bool,
         event_proxy: &impl EventProxy<UserEvent>,
+        state: UiState,
     ) -> FullOutput {
         self.context.run(raw_input, |ctx| {
-            self.ui(ctx, edit_context, texture_addable, event_proxy);
+            self.ui(ctx, edit_context, event_proxy, state);
         })
     }
 
@@ -88,8 +88,8 @@ impl Ui {
         &self,
         ctx: &Context,
         edit_context: &mut EditContext,
-        texture_addable: bool,
         event_proxy: &impl EventProxy<UserEvent>,
+        state: UiState,
     ) {
         let theme = CodeTheme::from_memory(ctx);
 
@@ -132,14 +132,26 @@ impl Ui {
                 if ui.button("Compile").clicked() {
                     event_proxy.send_event(UserEvent::RequestRedraw);
                 }
+
+                ui.separator();
+
                 if ui.button("New").clicked() {
                     event_proxy.send_event(UserEvent::NewFile);
                 }
+                if ui.button("Open").clicked() {
+                    event_proxy.send_event(UserEvent::OpenFile);
+                }
+
+                ui.separator();
+
                 if ui.button("Save").clicked() {
                     event_proxy.send_event(UserEvent::SaveFile);
                 }
-                if ui.button("Open").clicked() {
-                    event_proxy.send_event(UserEvent::OpenFile);
+                if ui
+                    .add_enabled(state.file_saved, Button::new("Save As"))
+                    .clicked()
+                {
+                    event_proxy.send_event(UserEvent::SaveFileAs);
                 }
             });
 
@@ -159,7 +171,7 @@ impl Ui {
                             event_proxy.send_event(UserEvent::ChangeTexture(index));
                         }
                     }
-                    if texture_addable {
+                    if state.texture_addable {
                         if image_upload(ui, image_size, None)
                             .on_hover_text("Add texture")
                             .clicked()
@@ -187,4 +199,9 @@ impl Ui {
             });
         });
     }
+}
+
+pub struct UiState {
+    pub file_saved: bool,
+    pub texture_addable: bool,
 }

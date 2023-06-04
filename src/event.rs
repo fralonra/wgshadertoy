@@ -16,6 +16,7 @@ pub enum UserEvent {
     OpenTexture,
     RequestRedraw,
     SaveFile,
+    SaveFileAs,
 }
 
 pub trait EventProxy<T> {

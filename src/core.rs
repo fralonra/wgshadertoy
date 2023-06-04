@@ -4,7 +4,7 @@ use crate::{
     event::{AppResponse, AppStatus, EventProxy, EventProxyWinit, UserEvent},
     fs::{create_file, select_file, select_texture, write_file},
     runtime::Runtime,
-    ui::{EditContext, Ui},
+    ui::{EditContext, Ui, UiState},
     viewport::Viewport,
     wgs::{self, WgsData},
 };
@@ -214,27 +214,13 @@ impl Core {
                 need_update = true;
             }
             UserEvent::SaveFile => {
-                self.wgs_data.set_frag(&self.ui_edit_context.frag);
-                self.wgs_data.set_name(&self.ui_edit_context.name);
-
-                if self.wgs_path.is_none() {
-                    self.wgs_path = create_file(&format!(
-                        "{}.{}",
-                        self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
-                        wgs::EXTENSION
-                    ));
-
-                    response.set_title = Some(format_title(&self.wgs_path));
-                };
-                if self.wgs_path.is_some() {
-                    self.wgs_data.set_frag(&self.ui_edit_context.frag);
-                    save_wgs(&self.wgs_path.as_ref().unwrap(), &self.wgs_data);
-
-                    self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
-                        AppStatus::Info,
-                        "Shader saved successfully!".to_owned(),
-                    ))));
-                    self.status_clock = Instant::now();
+                if let Some(title) = self.save_file() {
+                    response.set_title = Some(title);
+                }
+            }
+            UserEvent::SaveFileAs => {
+                if let Some(title) = self.save_file_as() {
+                    response.set_title = Some(title);
                 }
             }
         }
@@ -344,16 +330,22 @@ impl Core {
         }
 
         {
+            let file_saved = self.wgs_path.is_some();
             let texture_addable =
                 self.wgs_data.textures_ref().len() + 1 < self.runtime.max_texture_count() as usize;
+
+            let ui_state = UiState {
+                file_saved,
+                texture_addable,
+            };
 
             let raw_input = self.state.take_egui_input(window);
 
             let full_output = self.ui.prepare(
                 raw_input,
                 &mut self.ui_edit_context,
-                texture_addable,
                 &self.event_proxy,
+                ui_state,
             );
 
             self.state.handle_platform_output(
@@ -432,6 +424,55 @@ impl Core {
         surface_texture.present();
 
         Ok(())
+    }
+
+    fn save_file(&mut self) -> Option<String> {
+        self.save_file_impl(false)
+    }
+
+    fn save_file_as(&mut self) -> Option<String> {
+        self.save_file_impl(true)
+    }
+
+    fn save_file_impl(&mut self, save_as: bool) -> Option<String> {
+        self.wgs_data.set_frag(&self.ui_edit_context.frag);
+        self.wgs_data.set_name(&self.ui_edit_context.name);
+
+        if save_as {
+            // Save as.
+            if let Some(path) = create_file(&format!(
+                "{}.{}",
+                self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
+                wgs::EXTENSION
+            )) {
+                self.wgs_path = Some(path);
+            // Early return when cancelled.
+            } else {
+                return None;
+            }
+        // Never been saved before.
+        } else if self.wgs_path.is_none() {
+            self.wgs_path = create_file(&format!(
+                "{}.{}",
+                self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
+                wgs::EXTENSION
+            ));
+        }
+
+        if self.wgs_path.is_some() {
+            self.wgs_data.set_frag(&self.ui_edit_context.frag);
+            save_wgs(&self.wgs_path.as_ref().unwrap(), &self.wgs_data);
+
+            self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
+                AppStatus::Info,
+                "Shader saved successfully!".to_owned(),
+            ))));
+            self.status_clock = Instant::now();
+
+            Some(format_title(&self.wgs_path))
+        } else {
+            None
+        }
     }
 }
 
