@@ -1,7 +1,7 @@
 #[cfg(feature = "fps")]
 use crate::fps_counter::FpsCounter;
 use crate::{
-    event::{AppStatus, UserEvent},
+    event::{AppResponse, AppStatus, EventProxy, EventProxyWinit, UserEvent},
     fs::{create_file, select_file, select_texture, write_file},
     runtime::Runtime,
     ui::{EditContext, Ui},
@@ -9,6 +9,7 @@ use crate::{
     wgs::{self, WgsData},
 };
 use anyhow::Result;
+use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit::State;
 use image::ImageResult;
 use std::{
@@ -18,42 +19,40 @@ use std::{
     time::Instant,
 };
 use wgpu::SurfaceError;
-use winit::{
-    dpi::{PhysicalSize, Size},
-    event::{ElementState, Event, MouseButton, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
-    window::{Icon, Window, WindowBuilder},
-};
+use winit::{event::WindowEvent, event_loop::EventLoop, window::Window};
 
 const DEFAULT_FRAGMENT: &'static str = include_str!("assets/frag.default.wgsl");
 const DEFAULT_VERTEX: &'static str = include_str!("assets/vert.wgsl");
 
 pub struct Core {
     cursor: [f32; 2],
-    event_proxy: EventLoopProxy<UserEvent>,
+    event_proxy: EventProxyWinit<UserEvent>,
     #[cfg(feature = "fps")]
     fps_counter: FpsCounter,
     has_validation_error: bool,
-    status_clock: Instant,
     runtime: Runtime,
+    size: (f32, f32),
+    state: State,
+    status_clock: Instant,
     wgs_data: WgsData,
     wgs_path: Option<PathBuf>,
-    window: Window,
     ui: Ui,
     ui_edit_context: EditContext,
+    ui_render_pass: RenderPass,
 }
 
 impl Core {
-    pub fn new(event_loop: &EventLoop<UserEvent>) -> Result<Self> {
+    pub fn new<W>(
+        event_loop: &EventLoop<UserEvent>,
+        w: &W,
+        width: f32,
+        height: f32,
+        scale_factor: f32,
+    ) -> Result<Self>
+    where
+        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+    {
         let wgs_data = default_wgs();
-
-        let event_proxy = event_loop.create_proxy();
-
-        let window = WindowBuilder::new()
-            .with_min_inner_size(Size::Physical(PhysicalSize::new(720, 360)))
-            .with_title(format_title(&None))
-            .with_window_icon(window_icon())
-            .build(&event_loop)?;
 
         let textures = wgs_data
             .textures_ref()
@@ -62,16 +61,16 @@ impl Core {
             .collect();
 
         let runtime = Runtime::new(
-            &window,
+            w,
             &concat_shader_frag(&wgs_data.frag(), wgs_data.textures_ref().len()),
             DEFAULT_VERTEX,
             textures,
         )?;
 
         let mut state = State::new(&event_loop);
-        state.set_pixels_per_point(window.scale_factor() as f32);
+        state.set_pixels_per_point(scale_factor);
 
-        let mut ui = Ui::new(state);
+        let mut ui = Ui::new();
 
         for texture in wgs_data.textures_ref() {
             ui.add_texture(texture.width, texture.height, &texture.data);
@@ -82,12 +81,14 @@ impl Core {
             name: wgs_data.name(),
         };
 
-        event_proxy
-            .send_event(UserEvent::ChangeStatus(Some((
-                AppStatus::Info,
-                "Shader compiled successfully!".to_owned(),
-            ))))
-            .unwrap();
+        let ui_render_pass = RenderPass::new(runtime.device_ref(), runtime.format(), 1);
+
+        let event_proxy = event_loop.create_proxy();
+        let event_proxy = EventProxyWinit::from_proxy(event_proxy);
+        event_proxy.send_event(UserEvent::ChangeStatus(Some((
+            AppStatus::Info,
+            "Shader compiled successfully!".to_owned(),
+        ))));
 
         Ok(Self {
             cursor: Default::default(),
@@ -95,262 +96,240 @@ impl Core {
             #[cfg(feature = "fps")]
             fps_counter: FpsCounter::new(),
             has_validation_error: false,
-            status_clock: Instant::now(),
             runtime,
+            size: (width, height),
+            state,
+            status_clock: Instant::now(),
             wgs_data,
             wgs_path: None,
-            window,
             ui,
             ui_edit_context,
+            ui_render_pass,
         })
     }
 
-    pub fn run(mut self, event_loop: EventLoop<UserEvent>) {
-        event_loop.run(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Poll;
+    pub fn handle_mouse_input(&mut self, press: bool) {
+        if self.cursor[0] > self.size.0 / 2.0 {
+            if press {
+                self.runtime.update_mouse_press();
+            } else {
+                self.runtime.update_mouse_release();
+            }
+        }
+    }
 
-            match event {
-                Event::MainEventsCleared => self.window.request_redraw(),
-                Event::RedrawRequested(_) => {
-                    if self.status_clock.elapsed().as_secs() > 5 {
-                        self.ui.change_status(None);
-                    }
+    pub fn handle_user_event(&mut self, event: UserEvent) -> AppResponse {
+        let mut response = AppResponse::default();
 
-                    if self.runtime.pop_error_scope().is_some() {
-                        self.has_validation_error = true;
-                        self.event_proxy
-                            .send_event(UserEvent::ChangeStatus(Some((
-                                AppStatus::Error,
-                                "Shader validation error".to_string(),
-                            ))))
-                            .unwrap();
-                        self.status_clock = Instant::now();
-                    }
+        let mut need_update = false;
 
-                    if let Err(error) = self.render() {
-                        match error.downcast_ref::<SurfaceError>() {
-                            Some(SurfaceError::OutOfMemory) => {
-                                panic!("Swapchain error: {}. Rendering cannot continue.", error)
-                            }
-                            Some(_) | None => {
-                                log::warn!("Failed to render: {}", error);
-                                self.window.request_redraw();
-                            }
+        match event {
+            UserEvent::ChangeStatus(status) => {
+                self.ui.change_status(status);
+            }
+            UserEvent::ChangeTexture(index) => {
+                let path = select_texture();
+                if path.is_some() {
+                    let path = path.unwrap();
+
+                    match open_image(path) {
+                        Ok((width, height, data)) => {
+                            self.runtime.change_texture(index, width, height, &data);
+                            self.ui.change_texture(index, width, height, &data);
+                            self.wgs_data.change_texture(index, width, height, data);
+                        }
+                        Err(err) => {
+                            log::error!("Failed to open texture: {}", err);
                         }
                     }
-
-                    #[cfg(feature = "fps")]
-                    log::info!("FPS: {}", self.fps_counter.tick());
+                } else {
+                    self.runtime.remove_texture(index);
+                    self.ui.remove_texture(index);
+                    self.wgs_data.remove_texture(index);
                 }
-                Event::WindowEvent {
-                    ref event,
-                    window_id,
-                } if window_id == self.window.id() => {
-                    self.ui.handle_event(event);
+            }
+            UserEvent::NewFile => {
+                self.wgs_data = default_wgs();
+                self.wgs_path = None;
+                self.ui.reset_textures();
+                self.ui_edit_context.frag = self.wgs_data.frag();
+                self.ui_edit_context.name = self.wgs_data.name();
 
-                    match event {
-                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                        WindowEvent::CursorMoved { position, .. } => {
-                            self.cursor = [position.x as f32, position.y as f32];
-                            let half_width = self.window.inner_size().width as f32 / 2.0;
-                            if position.x as f32 > half_width {
-                                self.runtime.update_cursor([
-                                    position.x as f32 - half_width,
-                                    position.y as f32,
-                                ]);
-                            }
-                        }
-                        WindowEvent::MouseInput { button, state, .. } => match button {
-                            MouseButton::Left => {
-                                let half_width = self.window.inner_size().width as f32 / 2.0;
-                                if self.cursor[0] > half_width {
-                                    match state {
-                                        ElementState::Pressed => self.runtime.update_mouse_press(),
-                                        ElementState::Released => {
-                                            self.runtime.update_mouse_release()
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {}
-                        },
-                        WindowEvent::Resized(physical_size) => {
-                            self.runtime
-                                .resize(physical_size.width, physical_size.height);
-                            self.window.request_redraw();
-                        }
-                        _ => {}
-                    }
-                }
-                Event::UserEvent(event) => {
-                    let mut need_update = false;
+                response.set_title = Some(format_title(&self.wgs_path));
 
-                    match event {
-                        UserEvent::ChangeStatus(status) => {
-                            self.ui.change_status(status);
-                        }
-                        UserEvent::ChangeTexture(index) => {
-                            let path = select_texture();
-                            if path.is_some() {
-                                let path = path.unwrap();
-
-                                match open_image(path) {
-                                    Ok((width, height, data)) => {
-                                        self.runtime.change_texture(index, width, height, &data);
-                                        self.ui.change_texture(index, width, height, &data);
-                                        self.wgs_data.change_texture(index, width, height, data);
-                                    }
-                                    Err(err) => {
-                                        log::error!("Failed to open texture: {}", err);
-                                    }
-                                }
-                            } else {
-                                self.runtime.remove_texture(index);
-                                self.ui.remove_texture(index);
-                                self.wgs_data.remove_texture(index);
-                            }
-                        }
-                        UserEvent::NewFile => {
-                            self.wgs_data = default_wgs();
-                            self.wgs_path = None;
-                            self.window.set_title(&format_title(&self.wgs_path));
+                need_update = true;
+            }
+            UserEvent::OpenFile => {
+                let path = select_file();
+                if path.is_some() {
+                    let path = path.unwrap();
+                    match load_wgs(path.clone()) {
+                        Ok(wgs_data) => {
+                            self.wgs_data = wgs_data;
+                            self.wgs_path = Some(path);
 
                             self.ui.reset_textures();
+                            for texture in self.wgs_data.textures_ref() {
+                                self.runtime.add_texture(
+                                    texture.width,
+                                    texture.height,
+                                    &texture.data,
+                                );
+                                self.ui
+                                    .add_texture(texture.width, texture.height, &texture.data);
+                            }
+
                             self.ui_edit_context.frag = self.wgs_data.frag();
                             self.ui_edit_context.name = self.wgs_data.name();
 
+                            response.set_title = Some(format_title(&self.wgs_path));
+
                             need_update = true;
                         }
-                        UserEvent::OpenFile => {
-                            let path = select_file();
-                            if path.is_some() {
-                                let path = path.unwrap();
-                                match load_wgs(path.clone()) {
-                                    Ok(wgs_data) => {
-                                        self.wgs_data = wgs_data;
-                                        self.wgs_path = Some(path);
-                                        self.window.set_title(&format_title(&self.wgs_path));
-
-                                        self.ui.reset_textures();
-                                        for texture in self.wgs_data.textures_ref() {
-                                            self.runtime.add_texture(
-                                                texture.width,
-                                                texture.height,
-                                                &texture.data,
-                                            );
-                                            self.ui.add_texture(
-                                                texture.width,
-                                                texture.height,
-                                                &texture.data,
-                                            );
-                                        }
-
-                                        self.ui_edit_context.frag = self.wgs_data.frag();
-                                        self.ui_edit_context.name = self.wgs_data.name();
-
-                                        need_update = true;
-                                    }
-                                    Err(err) => {
-                                        log::error!("Failed to open file: {}", err);
-                                    }
-                                }
-                            }
-                        }
-                        UserEvent::OpenTexture => {
-                            let path = select_texture();
-                            if path.is_some() {
-                                let path = path.unwrap();
-
-                                match open_image(path) {
-                                    Ok((width, height, data)) => {
-                                        self.runtime.add_texture(width, height, &data);
-                                        self.ui.add_texture(width, height, &data);
-                                        self.wgs_data.add_texture(width, height, data);
-                                    }
-                                    Err(err) => {
-                                        log::error!("Failed to open texture: {}", err);
-                                    }
-                                }
-                            }
-                        }
-                        UserEvent::RequestRedraw => {
-                            self.wgs_data.set_frag(&self.ui_edit_context.frag);
-                            need_update = true;
-                        }
-                        UserEvent::SaveFile => {
-                            self.wgs_data.set_frag(&self.ui_edit_context.frag);
-                            self.wgs_data.set_name(&self.ui_edit_context.name);
-
-                            if self.wgs_path.is_none() {
-                                self.wgs_path = create_file(&format!(
-                                    "{}.{}",
-                                    self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
-                                    wgs::EXTENSION
-                                ));
-                                self.window.set_title(&format_title(&self.wgs_path));
-                            };
-                            if self.wgs_path.is_some() {
-                                self.wgs_data.set_frag(&self.ui_edit_context.frag);
-                                save_wgs(&self.wgs_path.as_ref().unwrap(), &self.wgs_data);
-
-                                self.event_proxy
-                                    .send_event(UserEvent::ChangeStatus(Some((
-                                        AppStatus::Info,
-                                        "Shader saved successfully!".to_owned(),
-                                    ))))
-                                    .unwrap();
-                                self.status_clock = Instant::now();
-                            }
-                        }
-                    }
-
-                    if need_update {
-                        self.has_validation_error = false;
-
-                        let textures = self
-                            .wgs_data
-                            .textures_ref()
-                            .iter()
-                            .map(|texture| (texture.width, texture.height, &texture.data))
-                            .collect();
-                        match self.runtime.update(
-                            &concat_shader_frag(
-                                &self.wgs_data.frag(),
-                                self.wgs_data.textures_ref().len(),
-                            ),
-                            textures,
-                        ) {
-                            Ok(()) => {
-                                self.event_proxy
-                                    .send_event(UserEvent::ChangeStatus(Some((
-                                        AppStatus::Info,
-                                        "Shader compiled successfully!".to_owned(),
-                                    ))))
-                                    .unwrap();
-                                self.status_clock = Instant::now();
-
-                                self.window.request_redraw();
-                            }
-                            Err(err) => {
-                                self.event_proxy
-                                    .send_event(UserEvent::ChangeStatus(Some((
-                                        AppStatus::Error,
-                                        err.to_string(),
-                                    ))))
-                                    .unwrap();
-                                self.status_clock = Instant::now();
-                            }
+                        Err(err) => {
+                            log::error!("Failed to open file: {}", err);
                         }
                     }
                 }
-                _ => {}
             }
-        });
+            UserEvent::OpenTexture => {
+                let path = select_texture();
+                if path.is_some() {
+                    let path = path.unwrap();
+
+                    match open_image(path) {
+                        Ok((width, height, data)) => {
+                            self.runtime.add_texture(width, height, &data);
+                            self.ui.add_texture(width, height, &data);
+                            self.wgs_data.add_texture(width, height, data);
+                        }
+                        Err(err) => {
+                            log::error!("Failed to open texture: {}", err);
+                        }
+                    }
+                }
+            }
+            UserEvent::RequestRedraw => {
+                self.wgs_data.set_frag(&self.ui_edit_context.frag);
+                need_update = true;
+            }
+            UserEvent::SaveFile => {
+                self.wgs_data.set_frag(&self.ui_edit_context.frag);
+                self.wgs_data.set_name(&self.ui_edit_context.name);
+
+                if self.wgs_path.is_none() {
+                    self.wgs_path = create_file(&format!(
+                        "{}.{}",
+                        self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
+                        wgs::EXTENSION
+                    ));
+
+                    response.set_title = Some(format_title(&self.wgs_path));
+                };
+                if self.wgs_path.is_some() {
+                    self.wgs_data.set_frag(&self.ui_edit_context.frag);
+                    save_wgs(&self.wgs_path.as_ref().unwrap(), &self.wgs_data);
+
+                    self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
+                        AppStatus::Info,
+                        "Shader saved successfully!".to_owned(),
+                    ))));
+                    self.status_clock = Instant::now();
+                }
+            }
+        }
+
+        if need_update {
+            self.has_validation_error = false;
+
+            let textures = self
+                .wgs_data
+                .textures_ref()
+                .iter()
+                .map(|texture| (texture.width, texture.height, &texture.data))
+                .collect();
+
+            match self.runtime.update(
+                &concat_shader_frag(&self.wgs_data.frag(), self.wgs_data.textures_ref().len()),
+                textures,
+            ) {
+                Ok(()) => {
+                    self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
+                        AppStatus::Info,
+                        "Shader compiled successfully!".to_owned(),
+                    ))));
+                    self.status_clock = Instant::now();
+
+                    response.request_redraw = true;
+                }
+                Err(err) => {
+                    self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
+                        AppStatus::Error,
+                        err.to_string(),
+                    ))));
+                    self.status_clock = Instant::now();
+                }
+            }
+        }
+
+        response
     }
 
-    fn render(&mut self) -> Result<()> {
-        let size = self.window.inner_size();
-        let half_width = size.width as f32 / 2.0;
+    pub fn handle_window_event(&mut self, event: &WindowEvent) {
+        self.state.on_event(self.ui.context(), event);
+    }
+
+    pub fn redraw(&mut self, window: &Window) -> bool {
+        let mut request_redraw = false;
+
+        if self.status_clock.elapsed().as_secs() > 5 {
+            self.ui.change_status(None);
+        }
+
+        if self.runtime.pop_error_scope().is_some() {
+            self.has_validation_error = true;
+            self.event_proxy.send_event(UserEvent::ChangeStatus(Some((
+                AppStatus::Error,
+                "Shader validation error".to_string(),
+            ))));
+            self.status_clock = Instant::now();
+        }
+
+        if let Err(error) = self.render(window) {
+            match error.downcast_ref::<SurfaceError>() {
+                Some(SurfaceError::OutOfMemory) => {
+                    panic!("Swapchain error: {}. Rendering cannot continue.", error)
+                }
+                Some(_) | None => {
+                    log::warn!("Failed to render: {}", error);
+                    request_redraw = true;
+                }
+            }
+        }
+
+        #[cfg(feature = "fps")]
+        log::info!("FPS: {}", self.fps_counter.tick());
+
+        request_redraw
+    }
+
+    pub fn resize(&mut self, width: f32, height: f32) {
+        self.size = (width, height);
+
+        self.runtime.resize(width, height);
+    }
+
+    pub fn update_cursor(&mut self, x: f32, y: f32) {
+        self.cursor = [x, y];
+
+        let half_width = self.size.0 / 2.0;
+        if x > half_width {
+            self.runtime.update_cursor([x - half_width, y]);
+        }
+    }
+
+    fn render(&mut self, window: &Window) -> Result<()> {
+        let half_width = self.size.0 / 2.0;
 
         let (surface_texture, texture_view) = self.runtime.get_surface()?;
 
@@ -358,7 +337,7 @@ impl Core {
             let viewport = Viewport {
                 x: half_width,
                 width: half_width,
-                height: size.height as f32,
+                height: self.size.1,
                 ..Default::default()
             };
             self.runtime.render(&texture_view, &viewport)?;
@@ -368,25 +347,86 @@ impl Core {
             let texture_addable =
                 self.wgs_data.textures_ref().len() + 1 < self.runtime.max_texture_count() as usize;
 
-            let (clipped_primitives, textures_delta) = self.ui.prepare(
-                &self.window,
+            let raw_input = self.state.take_egui_input(window);
+
+            let full_output = self.ui.prepare(
+                raw_input,
                 &mut self.ui_edit_context,
                 texture_addable,
                 &self.event_proxy,
             );
 
+            self.state.handle_platform_output(
+                window,
+                self.ui.context(),
+                full_output.platform_output,
+            );
+
+            let clipped_primitives = self.ui.context().tessellate(full_output.shapes);
+
             let viewport = Viewport {
                 width: half_width,
-                height: size.height as f32,
+                height: self.size.1,
                 ..Default::default()
             };
-            self.runtime.render_ui(
-                &texture_view,
-                &clipped_primitives,
-                &textures_delta,
-                &viewport,
-                self.window.scale_factor() as f32,
-            )?;
+
+            self.runtime.render_with(|device, queue| {
+                self.ui_render_pass
+                    .add_textures(device, queue, &full_output.textures_delta)?;
+
+                let screen_descriptor = ScreenDescriptor {
+                    physical_width: viewport.width as u32,
+                    physical_height: viewport.height as u32,
+                    scale_factor: window.scale_factor() as f32,
+                };
+
+                self.ui_render_pass.update_buffers(
+                    device,
+                    queue,
+                    &clipped_primitives,
+                    &screen_descriptor,
+                );
+
+                let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("UI Encoder"),
+                });
+
+                {
+                    let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Egui Main Render Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &texture_view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Load,
+                                store: true,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                    });
+
+                    render_pass.set_viewport(
+                        viewport.x,
+                        viewport.y,
+                        viewport.width,
+                        viewport.height,
+                        viewport.min_depth,
+                        viewport.max_depth,
+                    );
+
+                    self.ui_render_pass
+                        .execute_with_renderpass(
+                            &mut render_pass,
+                            &clipped_primitives,
+                            &screen_descriptor,
+                        )
+                        .unwrap();
+                }
+
+                queue.submit(Some(encoder.finish()));
+
+                Ok(())
+            })?;
         }
 
         surface_texture.present();
@@ -452,33 +492,4 @@ fn save_wgs(path: &PathBuf, wgs: &WgsData) {
     write_file(&path, writer.into_inner());
 
     log::info!("Saving wgs file: {:?}", path);
-}
-
-#[cfg(target_os = "macos")]
-fn window_icon() -> Option<Icon> {
-    None
-}
-
-#[cfg(not(target_os = "macos"))]
-fn window_icon() -> Option<Icon> {
-    match window_icon_from_memory(include_bytes!("../extra/windows/wgshadertoy.ico")) {
-        Ok(icon) => Some(icon),
-        Err(err) => {
-            log::warn!("Failed to load window icon: {}", err);
-            None
-        }
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn window_icon_from_memory(raw: &[u8]) -> Result<Icon> {
-    let image = image::load_from_memory(raw)?;
-
-    let image = image.into_rgba8();
-
-    let (width, height) = image.dimensions();
-
-    let icon = Icon::from_rgba(image.into_raw(), width, height)?;
-
-    Ok(icon)
 }

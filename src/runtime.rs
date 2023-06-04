@@ -2,26 +2,26 @@ mod uniform;
 
 use crate::viewport::Viewport;
 use anyhow::Result;
-use egui::{ClippedPrimitive, TexturesDelta};
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use std::{borrow::Cow, time::Instant};
 use uniform::Uniform;
-use wgpu::{util::DeviceExt, SurfaceTexture, TextureView};
-use winit::window::Window;
+use wgpu::util::DeviceExt;
 
 pub const UNIFORM_GROUP_ID: u32 = 0;
 
-async fn init_device(
-    window: &Window,
+async fn init_device<W>(
+    w: &W,
 ) -> (
     wgpu::Surface,
     wgpu::TextureFormat,
     (wgpu::Device, wgpu::Queue),
-) {
+)
+where
+    W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+{
     let default_backend = wgpu::Backends::PRIMARY;
     let backend = wgpu::util::backend_bits_from_env().unwrap_or(default_backend);
     let instance = wgpu::Instance::new(backend);
-    let surface = unsafe { instance.create_surface(window) };
+    let surface = unsafe { instance.create_surface(w) };
 
     let adapter =
         wgpu::util::initialize_adapter_from_env_or_default(&instance, backend, Some(&surface))
@@ -62,7 +62,6 @@ pub struct Runtime {
     surface: wgpu::Surface,
     texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
     time_instant: Instant,
-    ui_render_pass: RenderPass,
     uniform: Uniform,
     uniform_bind_group: wgpu::BindGroup,
     uniform_bind_group_layout: wgpu::BindGroupLayout,
@@ -70,13 +69,16 @@ pub struct Runtime {
 }
 
 impl Runtime {
-    pub fn new(
-        window: &Window,
+    pub fn new<W>(
+        w: &W,
         shader_frag: &str,
         shader_vert: &str,
         textures: Vec<(u32, u32, &Vec<u8>)>,
-    ) -> Result<Self> {
-        let (surface, format, (device, queue)) = futures::executor::block_on(init_device(window));
+    ) -> Result<Self>
+    where
+        W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+    {
+        let (surface, format, (device, queue)) = futures::executor::block_on(init_device(w));
 
         device.push_error_scope(wgpu::ErrorFilter::Validation);
 
@@ -104,8 +106,6 @@ impl Runtime {
             format,
         )?;
 
-        let ui_render_pass = RenderPass::new(&device, format, 1);
-
         Ok(Self {
             device,
             format,
@@ -116,7 +116,6 @@ impl Runtime {
             surface,
             texture_bind_groups,
             time_instant: Instant::now(),
-            ui_render_pass,
             uniform,
             uniform_bind_group,
             uniform_bind_group_layout,
@@ -146,7 +145,15 @@ impl Runtime {
         );
     }
 
-    pub fn get_surface(&self) -> Result<(SurfaceTexture, TextureView)> {
+    pub fn device_ref(&self) -> &wgpu::Device {
+        &self.device
+    }
+
+    pub fn format(&self) -> wgpu::TextureFormat {
+        self.format
+    }
+
+    pub fn get_surface(&self) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView)> {
         let surface_texture = self.surface.get_current_texture()?;
 
         let texture_view = surface_texture
@@ -173,7 +180,7 @@ impl Runtime {
         self.texture_bind_groups.remove(index);
     }
 
-    pub fn render(&mut self, view: &TextureView, viewport: &Viewport) -> Result<()> {
+    pub fn render(&mut self, view: &wgpu::TextureView, viewport: &Viewport) -> Result<()> {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -223,83 +230,29 @@ impl Runtime {
         Ok(())
     }
 
-    pub fn render_ui(
-        &mut self,
-        view: &TextureView,
-        clipped_primitives: &Vec<ClippedPrimitive>,
-        textures_delta: &TexturesDelta,
-        viewport: &Viewport,
-        scale_factor: f32,
-    ) -> Result<()> {
-        self.ui_render_pass
-            .add_textures(&self.device, &self.queue, textures_delta)?;
-
-        let screen_descriptor = ScreenDescriptor {
-            physical_width: viewport.width as u32,
-            physical_height: viewport.height as u32,
-            scale_factor,
-        };
-
-        self.ui_render_pass.update_buffers(
-            &self.device,
-            &self.queue,
-            &clipped_primitives,
-            &screen_descriptor,
-        );
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("UI Encoder"),
-            });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Egui Main Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Load,
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
-
-            render_pass.set_viewport(
-                viewport.x,
-                viewport.y,
-                viewport.width,
-                viewport.height,
-                viewport.min_depth,
-                viewport.max_depth,
-            );
-
-            self.ui_render_pass
-                .execute_with_renderpass(&mut render_pass, &clipped_primitives, &screen_descriptor)
-                .unwrap();
-        }
-
-        self.queue.submit(Some(encoder.finish()));
+    pub fn render_with<F>(&mut self, mut f: F) -> Result<()>
+    where
+        F: FnMut(&wgpu::Device, &wgpu::Queue) -> Result<()>,
+    {
+        f(&self.device, &self.queue)?;
 
         Ok(())
     }
 
-    pub fn resize(&mut self, width: u32, height: u32) {
+    pub fn resize(&mut self, width: f32, height: f32) {
         self.surface.configure(
             &self.device,
             &wgpu::SurfaceConfiguration {
                 usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                 format: self.format,
-                width,
-                height,
+                width: width as u32,
+                height: height as u32,
                 present_mode: wgpu::PresentMode::AutoVsync,
                 alpha_mode: wgpu::CompositeAlphaMode::Auto,
             },
         );
 
-        self.uniform.resolution = [width as f32 / 2.0, height as f32];
+        self.uniform.resolution = [width / 2.0, height];
     }
 
     pub fn update(&mut self, shader_frag: &str, textures: Vec<(u32, u32, &Vec<u8>)>) -> Result<()> {
@@ -483,14 +436,6 @@ fn create_texture(
     });
 
     (texture_bind_group_layout, texture_bind_group)
-}
-
-fn get_texture_view(surface_texture: &SurfaceTexture) -> Result<TextureView> {
-    let texture_view = surface_texture
-        .texture
-        .create_view(&wgpu::TextureViewDescriptor::default());
-
-    Ok(texture_view)
 }
 
 fn setup_uniform(

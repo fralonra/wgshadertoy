@@ -1,16 +1,14 @@
 mod highlight;
 mod image_upload;
 
-use crate::event::{AppStatus, UserEvent};
+use crate::event::{AppStatus, EventProxy, UserEvent};
 use egui::{
-    style::FontSelection, widgets, Align, CentralPanel, ClippedPrimitive, Color32, ColorImage,
-    Context, ImageData, Layout, ScrollArea, TextEdit, TextureFilter, TextureHandle, TexturesDelta,
+    style::FontSelection, widgets, Align, CentralPanel, Color32, ColorImage, Context, FullOutput,
+    ImageData, Layout, RawInput, ScrollArea, TextEdit, TextureFilter, TextureHandle,
     TopBottomPanel,
 };
-use egui_winit::State;
 use highlight::{CodeTheme, Highlighter};
 use image_upload::image_upload;
-use winit::{event::WindowEvent, event_loop::EventLoopProxy, window::Window};
 
 pub struct EditContext {
     pub frag: String,
@@ -21,19 +19,17 @@ pub struct Ui {
     app_status: Option<(AppStatus, String)>,
     context: Context,
     highlighter: Highlighter,
-    state: State,
     textures: Vec<TextureHandle>,
 }
 
 impl Ui {
-    pub fn new(state: State) -> Self {
+    pub fn new() -> Self {
         let context = egui::Context::default();
 
         Self {
             app_status: None,
             context,
             highlighter: Highlighter::default(),
-            state,
             textures: vec![],
         }
     }
@@ -64,29 +60,20 @@ impl Ui {
         );
     }
 
-    pub fn handle_event(&mut self, event: &WindowEvent) {
-        self.state.on_event(&self.context, event);
+    pub fn context(&self) -> &Context {
+        &self.context
     }
 
     pub fn prepare(
         &mut self,
-        window: &Window,
+        raw_input: RawInput,
         edit_context: &mut EditContext,
         texture_addable: bool,
-        event_proxy: &EventLoopProxy<UserEvent>,
-    ) -> (Vec<ClippedPrimitive>, TexturesDelta) {
-        let raw_input = self.state.take_egui_input(window);
-
-        let full_output = self.context.run(raw_input, |ctx| {
+        event_proxy: &impl EventProxy<UserEvent>,
+    ) -> FullOutput {
+        self.context.run(raw_input, |ctx| {
             self.ui(ctx, edit_context, texture_addable, event_proxy);
-        });
-
-        self.state
-            .handle_platform_output(window, &self.context, full_output.platform_output);
-
-        let clipped_primitives = self.context.tessellate(full_output.shapes);
-
-        (clipped_primitives, full_output.textures_delta)
+        })
     }
 
     pub fn remove_texture(&mut self, index: usize) {
@@ -102,13 +89,14 @@ impl Ui {
         ctx: &Context,
         edit_context: &mut EditContext,
         texture_addable: bool,
-        event_proxy: &EventLoopProxy<UserEvent>,
+        event_proxy: &impl EventProxy<UserEvent>,
     ) {
         let theme = CodeTheme::from_memory(ctx);
 
         let mut layouter = |ui: &egui::Ui, string: &str, wrap_width: f32| {
             let mut layout_job = self.highlighter.highlight(&theme, string);
             layout_job.wrap.max_width = wrap_width;
+
             ui.fonts().layout_job(layout_job)
         };
 
@@ -142,16 +130,16 @@ impl Ui {
             widgets::global_dark_light_mode_switch(ui);
             ui.horizontal(|ui| {
                 if ui.button("Compile").clicked() {
-                    event_proxy.send_event(UserEvent::RequestRedraw).unwrap();
+                    event_proxy.send_event(UserEvent::RequestRedraw);
                 }
                 if ui.button("New").clicked() {
-                    event_proxy.send_event(UserEvent::NewFile).unwrap();
+                    event_proxy.send_event(UserEvent::NewFile);
                 }
                 if ui.button("Save").clicked() {
-                    event_proxy.send_event(UserEvent::SaveFile).unwrap();
+                    event_proxy.send_event(UserEvent::SaveFile);
                 }
                 if ui.button("Open").clicked() {
-                    event_proxy.send_event(UserEvent::OpenFile).unwrap();
+                    event_proxy.send_event(UserEvent::OpenFile);
                 }
             });
 
@@ -168,9 +156,7 @@ impl Ui {
                             .on_hover_text("Change/Remove (abort selection) the texture")
                             .clicked()
                         {
-                            event_proxy
-                                .send_event(UserEvent::ChangeTexture(index))
-                                .unwrap();
+                            event_proxy.send_event(UserEvent::ChangeTexture(index));
                         }
                     }
                     if texture_addable {
@@ -178,7 +164,7 @@ impl Ui {
                             .on_hover_text("Add texture")
                             .clicked()
                         {
-                            event_proxy.send_event(UserEvent::OpenTexture).unwrap();
+                            event_proxy.send_event(UserEvent::OpenTexture);
                         }
                     }
                 });
@@ -188,8 +174,10 @@ impl Ui {
                         let editor = TextEdit::multiline(&mut edit_context.frag)
                             .code_editor()
                             .desired_width(ui.available_width() / 2.0 - 16.0);
+
                         let font_id = FontSelection::default().resolve(ui.style());
                         let row_height = ui.fonts().row_height(&font_id) as f32;
+
                         let editor = editor
                             .desired_rows((ui.available_height() / row_height) as usize)
                             .layouter(&mut layouter);
