@@ -1,8 +1,10 @@
+mod pausable_instant;
 mod uniform;
 
 use crate::viewport::Viewport;
 use anyhow::Result;
-use std::{borrow::Cow, time::Instant};
+use pausable_instant::PausableInstant;
+use std::borrow::Cow;
 use uniform::Uniform;
 use wgpu::util::DeviceExt;
 
@@ -55,13 +57,14 @@ where
 pub struct Runtime {
     device: wgpu::Device,
     format: wgpu::TextureFormat,
+    is_paused: bool,
     pipeline: wgpu::RenderPipeline,
     queue: wgpu::Queue,
     sampler: wgpu::Sampler,
     shader_vert: String,
     surface: wgpu::Surface,
     texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
-    time_instant: Instant,
+    time_instant: PausableInstant,
     uniform: Uniform,
     uniform_bind_group: wgpu::BindGroup,
     uniform_bind_group_layout: wgpu::BindGroupLayout,
@@ -109,13 +112,14 @@ impl Runtime {
         Ok(Self {
             device,
             format,
+            is_paused: false,
             pipeline,
             queue,
             sampler,
             shader_vert: shader_vert.to_string(),
             surface,
             texture_bind_groups,
-            time_instant: Instant::now(),
+            time_instant: PausableInstant::now(),
             uniform,
             uniform_bind_group,
             uniform_bind_group_layout,
@@ -163,8 +167,18 @@ impl Runtime {
         Ok((surface_texture, texture_view))
     }
 
+    pub fn is_paused(&self) -> bool {
+        self.is_paused
+    }
+
     pub fn max_texture_count(&self) -> u32 {
         self.device.limits().max_bind_groups
+    }
+
+    pub fn pause(&mut self) {
+        self.is_paused = true;
+
+        self.time_instant.pause();
     }
 
     pub fn pop_error_scope(&mut self) -> Option<wgpu::Error> {
@@ -255,13 +269,24 @@ impl Runtime {
         self.uniform.resolution = [width / 2.0, height];
     }
 
-    pub fn update(&mut self, shader_frag: &str, textures: Vec<(u32, u32, &Vec<u8>)>) -> Result<()> {
-        self.time_instant = Instant::now();
+    pub fn restart(&mut self) {
+        self.is_paused = false;
+
+        self.time_instant = PausableInstant::now();
 
         let resolution = self.uniform.resolution;
+
         self.uniform = Uniform::default();
         self.uniform.resolution = resolution;
+    }
 
+    pub fn resume(&mut self) {
+        self.is_paused = false;
+
+        self.time_instant.resume();
+    }
+
+    pub fn update(&mut self, shader_frag: &str, textures: Vec<(u32, u32, &Vec<u8>)>) -> Result<()> {
         let texture_bind_groups = textures
             .iter()
             .map(|(width, height, data)| {
@@ -277,10 +302,12 @@ impl Runtime {
             .collect();
 
         self.texture_bind_groups = texture_bind_groups;
+
         let mut bind_group_layouts = vec![&self.uniform_bind_group_layout];
         for (layout, _) in &self.texture_bind_groups {
             bind_group_layouts.push(layout);
         }
+
         self.pipeline = build_pipeline(
             shader_frag,
             &self.shader_vert,
@@ -289,19 +316,33 @@ impl Runtime {
             self.format,
         )?;
 
+        self.restart();
+
         Ok(())
     }
 
     pub fn update_cursor(&mut self, cursor: [f32; 2]) {
+        if self.is_paused {
+            return;
+        }
+
         self.uniform.cursor = [cursor[0], self.uniform.resolution[1] - cursor[1]];
     }
 
     pub fn update_mouse_press(&mut self) {
+        if self.is_paused {
+            return;
+        }
+
         self.uniform.mouse_down = 1;
         self.uniform.mouse_press = self.uniform.cursor;
     }
 
     pub fn update_mouse_release(&mut self) {
+        if self.is_paused {
+            return;
+        }
+
         self.uniform.mouse_down = 0;
         self.uniform.mouse_release = self.uniform.cursor;
     }
@@ -319,14 +360,17 @@ fn build_pipeline(
         bind_group_layouts,
         push_constant_ranges: &[],
     });
+
     let fs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Shader"),
         source: wgpu::ShaderSource::Wgsl(Cow::from(shader_frag)),
     });
+
     let vs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Shader"),
         source: wgpu::ShaderSource::Wgsl(Cow::from(shader_vert)),
     });
+
     let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Render Pipeline"),
         layout: Some(&pipeline_layout),
@@ -353,6 +397,7 @@ fn build_pipeline(
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
     });
+
     Ok(pipeline)
 }
 
@@ -369,6 +414,7 @@ fn create_texture(
         height,
         depth_or_array_layers: 1,
     };
+
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         size: texture_size,
         mip_level_count: 1,

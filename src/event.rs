@@ -14,7 +14,10 @@ pub enum UserEvent {
     NewFile,
     OpenFile,
     OpenTexture,
+    Pause,
     RequestRedraw,
+    Restart,
+    Resume,
     SaveFile,
     SaveFileAs,
 }

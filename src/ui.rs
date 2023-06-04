@@ -149,6 +149,22 @@ impl Ui {
                 {
                     event_proxy.send_event(UserEvent::SaveFileAs);
                 }
+
+                ui.separator();
+
+                if ui.button("Restart").clicked() {
+                    event_proxy.send_event(UserEvent::Restart);
+                }
+                if ui
+                    .button(if state.is_paused { "Resume" } else { "Pause" })
+                    .clicked()
+                {
+                    event_proxy.send_event(if state.is_paused {
+                        UserEvent::Resume
+                    } else {
+                        UserEvent::Pause
+                    });
+                }
             });
 
             ui.horizontal(|ui| {
@@ -199,6 +215,7 @@ impl Ui {
 
 pub struct UiState {
     pub file_saved: bool,
+    pub is_paused: bool,
     pub status: AppStatus,
     pub texture_addable: bool,
 }

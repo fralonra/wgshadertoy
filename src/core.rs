@@ -206,9 +206,18 @@ impl Core {
                     }
                 }
             }
+            UserEvent::Pause => {
+                self.runtime.pause();
+            }
             UserEvent::RequestRedraw => {
                 self.wgs_data.set_frag(&self.ui_edit_context.frag);
                 need_update = true;
+            }
+            UserEvent::Restart => {
+                self.runtime.restart();
+            }
+            UserEvent::Resume => {
+                self.runtime.resume();
             }
             UserEvent::SaveFile => {
                 if let Some(title) = self.save_file() {
@@ -322,14 +331,12 @@ impl Core {
         }
 
         {
-            let file_saved = self.wgs_path.is_some();
-            let texture_addable =
-                self.wgs_data.textures_ref().len() + 1 < self.runtime.max_texture_count() as usize;
-
             let ui_state = UiState {
-                file_saved,
+                file_saved: self.wgs_path.is_some(),
+                is_paused: self.runtime.is_paused(),
                 status: self.status.clone(),
-                texture_addable,
+                texture_addable: self.wgs_data.textures_ref().len() + 1
+                    < self.runtime.max_texture_count() as usize,
             };
 
             let raw_input = self.state.take_egui_input(window);
