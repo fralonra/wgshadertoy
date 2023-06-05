@@ -131,9 +131,16 @@ impl Runtime {
 
         if let Some(surface_texture) = self.surface_texture.take() {
             if let Some((viewport, callback)) = self.captured_callback.take() {
-                let (width, height, buffer) = futures::executor::block_on(
-                    self.capture_image(&viewport, surface_texture.texture.as_image_copy()),
-                )?;
+                let texture = &surface_texture.texture;
+
+                let size = texture.size();
+
+                let (width, height, buffer) = futures::executor::block_on(self.capture_image(
+                    &viewport,
+                    size.width,
+                    size.height,
+                    texture.as_image_copy(),
+                ))?;
 
                 callback(width, height, buffer);
             }
@@ -367,19 +374,18 @@ impl Runtime {
     async fn capture_image(
         &mut self,
         viewport: &Viewport,
+        raw_width: u32,
+        raw_height: u32,
         image_texture: wgpu::ImageCopyTexture<'_>,
     ) -> Result<(u32, u32, Vec<u8>)> {
-        let width = viewport.width as u32;
-        let height = viewport.height as u32;
-
         let align_width = align_up(
-            width * DATA_PER_PIXEL * U8_SIZE,
+            raw_width * DATA_PER_PIXEL * U8_SIZE,
             wgpu::COPY_BYTES_PER_ROW_ALIGNMENT,
         ) / U8_SIZE;
 
         let texture_size = wgpu::Extent3d {
-            width,
-            height,
+            width: raw_width,
+            height: raw_height,
             depth_or_array_layers: 1,
         };
 
@@ -391,7 +397,7 @@ impl Runtime {
 
         let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Buffer"),
-            size: (align_width * height) as wgpu::BufferAddress,
+            size: (align_width * raw_height) as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -401,7 +407,7 @@ impl Runtime {
             layout: wgpu::ImageDataLayout {
                 offset: 0,
                 bytes_per_row: Some(align_width),
-                rows_per_image: Some(height),
+                rows_per_image: None,
             },
         };
 
@@ -409,7 +415,17 @@ impl Runtime {
 
         self.queue.submit(Some(encoder.finish()));
 
-        let buffer = view_into_buffer(&self.device, viewport, &output_buffer).await?;
+        let buffer = view_into_buffer(
+            &self.device,
+            viewport,
+            raw_width,
+            raw_height,
+            &output_buffer,
+        )
+        .await?;
+
+        let width = viewport.width as u32;
+        let height = viewport.height as u32;
 
         Ok((width, height, buffer))
     }
@@ -654,15 +670,18 @@ fn setup_uniform(
     )
 }
 
-fn trim_image_buffer(width: u32, height: u32, buffer: &[u8]) -> Vec<u8> {
-    let mut output = Vec::with_capacity((width * height) as usize);
+fn trim_image_buffer(viewport: &Viewport, align_width: usize, buffer: &[u8]) -> Vec<u8> {
+    let x = viewport.x as usize;
+    let width = viewport.width as usize;
+    let height = viewport.height as usize;
 
-    let align_width = buffer.len() / height as usize;
+    let mut output = Vec::with_capacity(width * height);
 
-    for i in 0..height as usize {
-        for j in 0..width as usize {
-            output.push(buffer[i * align_width + j]);
-        }
+    let pad_before_per_row = x * DATA_PER_PIXEL as usize * U8_SIZE as usize;
+    let len_per_row = width * DATA_PER_PIXEL as usize * U8_SIZE as usize;
+
+    for chunk in buffer.chunks(align_width) {
+        output.append(&mut chunk[pad_before_per_row..pad_before_per_row + len_per_row].to_owned());
     }
 
     output
@@ -671,6 +690,8 @@ fn trim_image_buffer(width: u32, height: u32, buffer: &[u8]) -> Vec<u8> {
 async fn view_into_buffer(
     device: &wgpu::Device,
     viewport: &Viewport,
+    raw_width: u32,
+    raw_height: u32,
     raw_buffer: &wgpu::Buffer,
 ) -> Result<Vec<u8>> {
     let slice = raw_buffer.slice(..);
@@ -685,8 +706,8 @@ async fn view_into_buffer(
         let buffer_view = slice.get_mapped_range();
 
         let buffer = trim_image_buffer(
-            DATA_PER_PIXEL * viewport.width as u32,
-            viewport.height as u32,
+            viewport,
+            buffer_view.len() / raw_height as usize,
             &buffer_view,
         );
 
