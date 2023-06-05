@@ -2,7 +2,7 @@ use crate::{core::Core, event::UserEvent};
 use anyhow::Result;
 use std::path::PathBuf;
 use winit::{
-    dpi::{PhysicalSize, Size},
+    dpi::{LogicalSize, Size},
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder},
     window::{Icon, Window, WindowBuilder},
@@ -19,7 +19,7 @@ impl App {
         let event_loop = EventLoopBuilder::<UserEvent>::with_user_event().build();
 
         let window = WindowBuilder::new()
-            .with_min_inner_size(Size::Physical(PhysicalSize::new(720, 360)))
+            .with_min_inner_size(Size::Logical(LogicalSize::new(720.0, 360.0)))
             .with_title(format_title(&None))
             .with_window_icon(window_icon())
             .build(&event_loop)?;
