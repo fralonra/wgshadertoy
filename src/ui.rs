@@ -4,7 +4,7 @@ mod image_upload;
 use crate::event::{AppStatus, EventProxy, UserEvent};
 use egui::{
     style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
-    FullOutput, ImageData, Layout, RawInput, ScrollArea, TextEdit, TextureFilter, TextureHandle,
+    FullOutput, ImageData, Layout, RawInput, ScrollArea, TextEdit, TextureHandle, TextureOptions,
     TopBottomPanel,
 };
 use highlight::{CodeTheme, Highlighter};
@@ -39,7 +39,7 @@ impl Ui {
                 [width as usize, height as usize],
                 &data,
             )),
-            TextureFilter::Linear,
+            TextureOptions::LINEAR,
         ));
     }
 
@@ -50,7 +50,7 @@ impl Ui {
                 [width as usize, height as usize],
                 &data,
             )),
-            TextureFilter::Linear,
+            TextureOptions::LINEAR,
         );
     }
 
@@ -91,7 +91,7 @@ impl Ui {
             let mut layout_job = self.highlighter.highlight(&theme, string);
             layout_job.wrap.max_width = wrap_width;
 
-            ui.fonts().layout_job(layout_job)
+            ui.fonts(|f| f.layout_job(layout_job))
         };
 
         let is_dark = ctx.style().visuals.dark_mode;
@@ -201,7 +201,7 @@ impl Ui {
                             .desired_width(ui.available_width() / 2.0 - 16.0);
 
                         let font_id = FontSelection::default().resolve(ui.style());
-                        let row_height = ui.fonts().row_height(&font_id) as f32;
+                        let row_height = self.context.fonts(|fonts| fonts.row_height(&font_id));
 
                         let editor = editor
                             .desired_rows((ui.available_height() / row_height) as usize)

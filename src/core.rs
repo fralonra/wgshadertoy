@@ -288,8 +288,12 @@ impl Core {
             self.status = AppStatus::Idle;
         }
 
-        if self.runtime.pop_error_scope().is_some() {
+        if let Some(error_scope) = self.runtime.pop_error_scope() {
             self.has_validation_error = true;
+
+            if let wgpu::Error::Validation { description, .. } = error_scope {
+                log::error!("Validation error: {:?}", description);
+            }
 
             self.change_status(AppStatus::Error("Shader validation error".to_string()));
         }

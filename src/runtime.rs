@@ -43,7 +43,7 @@ impl Runtime {
     where
         W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
     {
-        let (surface, format, (device, queue)) = futures::executor::block_on(init_device(w));
+        let (surface, format, device, queue) = futures::executor::block_on(init_device(w))?;
 
         device.push_error_scope(wgpu::ErrorFilter::Validation);
 
@@ -55,7 +55,7 @@ impl Runtime {
         let texture_bind_groups = textures
             .iter()
             .map(|(width, height, data)| {
-                create_texture(&device, &queue, &sampler, *width, *height, &data)
+                create_texture(&device, &queue, &sampler, format, *width, *height, &data)
             })
             .collect::<Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>>();
 
@@ -97,6 +97,7 @@ impl Runtime {
             &self.device,
             &self.queue,
             &self.sampler,
+            self.format,
             width,
             height,
             buffer,
@@ -108,6 +109,7 @@ impl Runtime {
             &self.device,
             &self.queue,
             &self.sampler,
+            self.format,
             width,
             height,
             buffer,
@@ -276,6 +278,7 @@ impl Runtime {
                 height: height as u32,
                 present_mode: wgpu::PresentMode::AutoVsync,
                 alpha_mode: wgpu::CompositeAlphaMode::Auto,
+                view_formats: vec![self.format],
             },
         );
 
@@ -307,6 +310,7 @@ impl Runtime {
                     &self.device,
                     &self.queue,
                     &self.sampler,
+                    self.format,
                     *width,
                     *height,
                     &data,
@@ -396,8 +400,8 @@ impl Runtime {
             buffer: &output_buffer,
             layout: wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(align_width),
-                rows_per_image: std::num::NonZeroU32::new(height),
+                bytes_per_row: Some(align_width),
+                rows_per_image: Some(height),
             },
         };
 
@@ -420,7 +424,7 @@ fn build_pipeline(
     shader_vert: &str,
     bind_group_layouts: &[&wgpu::BindGroupLayout],
     device: &wgpu::Device,
-    texture_format: wgpu::TextureFormat,
+    format: wgpu::TextureFormat,
 ) -> Result<wgpu::RenderPipeline> {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Pipeline Layout"),
@@ -450,7 +454,7 @@ fn build_pipeline(
             module: &fs_module,
             entry_point: "main",
             targets: &[Some(wgpu::ColorTargetState {
-                format: texture_format,
+                format,
                 blend: Some(wgpu::BlendState::REPLACE),
                 write_mask: wgpu::ColorWrites::ALL,
             })],
@@ -472,6 +476,7 @@ fn create_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     sampler: &wgpu::Sampler,
+    format: wgpu::TextureFormat,
     width: u32,
     height: u32,
     buffer: &[u8],
@@ -487,9 +492,10 @@ fn create_texture(
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        format,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         label: Some("Diffuse Texture"),
+        view_formats: &[format],
     });
 
     queue.write_texture(
@@ -502,8 +508,8 @@ fn create_texture(
         buffer,
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: std::num::NonZeroU32::new(4 * width),
-            rows_per_image: std::num::NonZeroU32::new(height),
+            bytes_per_row: Some(4 * width),
+            rows_per_image: Some(height),
         },
         texture_size,
     );
@@ -553,46 +559,51 @@ fn create_texture(
 
 async fn init_device<W>(
     w: &W,
-) -> (
+) -> Result<(
     wgpu::Surface,
     wgpu::TextureFormat,
-    (wgpu::Device, wgpu::Queue),
-)
+    wgpu::Device,
+    wgpu::Queue,
+)>
 where
     W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
 {
-    let default_backend = wgpu::Backends::PRIMARY;
-    let backend = wgpu::util::backend_bits_from_env().unwrap_or(default_backend);
-    let instance = wgpu::Instance::new(backend);
-    let surface = unsafe { instance.create_surface(w) };
+    let backends = wgpu::util::backend_bits_from_env().unwrap_or_else(wgpu::Backends::all);
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends,
+        dx12_shader_compiler: wgpu::Dx12Compiler::default(),
+    });
 
-    let adapter =
-        wgpu::util::initialize_adapter_from_env_or_default(&instance, backend, Some(&surface))
-            .await
-            .expect("No suitable GPU adapters found on the system!");
+    let surface = unsafe { instance.create_surface(w)? };
 
-    let adapter_features = adapter.features();
+    if let Some(adapter) = instance
+        .request_adapter(&wgpu::RequestAdapterOptions::default())
+        .await
+    {
+        let format = surface
+            .get_capabilities(&adapter)
+            .formats
+            .first()
+            .copied()
+            .expect("Get preferred format.");
 
-    let texture_format = surface
-        .get_supported_formats(&adapter)
-        .first()
-        .copied()
-        .expect("Get preferred format");
-    (
-        surface,
-        texture_format,
-        adapter
+        let adapter_features = adapter.features();
+
+        let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: Some("Device Descriptor"),
                     features: adapter_features & wgpu::Features::default(),
-                    limits: wgpu::Limits::default(),
+                    limits: wgpu::Limits::downlevel_defaults(),
                 },
                 None,
             )
-            .await
-            .expect("Request device"),
-    )
+            .await?;
+
+        Ok((surface, format, device, queue))
+    } else {
+        bail!("No adapters are found that suffice all the 'hard' options.")
+    }
 }
 
 fn setup_uniform(

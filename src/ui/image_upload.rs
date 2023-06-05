@@ -28,7 +28,7 @@ pub fn image_upload(ui: &mut Ui, size: f32, texture: Option<&TextureHandle>) -> 
     painter.rect_stroke(rect, 5.0, stroke);
 
     if response.hovered() {
-        ui.output().cursor_icon = CursorIcon::PointingHand;
+        ui.output_mut(|o| o.cursor_icon = CursorIcon::PointingHand);
     }
 
     response
