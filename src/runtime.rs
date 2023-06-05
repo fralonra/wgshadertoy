@@ -2,7 +2,7 @@ mod pausable_instant;
 mod uniform;
 
 use crate::viewport::Viewport;
-use anyhow::Result;
+use anyhow::{bail, Result};
 use pausable_instant::PausableInstant;
 use std::borrow::Cow;
 use uniform::Uniform;
@@ -10,51 +10,11 @@ use wgpu::util::DeviceExt;
 
 pub const UNIFORM_GROUP_ID: u32 = 0;
 
-async fn init_device<W>(
-    w: &W,
-) -> (
-    wgpu::Surface,
-    wgpu::TextureFormat,
-    (wgpu::Device, wgpu::Queue),
-)
-where
-    W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
-{
-    let default_backend = wgpu::Backends::PRIMARY;
-    let backend = wgpu::util::backend_bits_from_env().unwrap_or(default_backend);
-    let instance = wgpu::Instance::new(backend);
-    let surface = unsafe { instance.create_surface(w) };
-
-    let adapter =
-        wgpu::util::initialize_adapter_from_env_or_default(&instance, backend, Some(&surface))
-            .await
-            .expect("No suitable GPU adapters found on the system!");
-
-    let adapter_features = adapter.features();
-
-    let texture_format = surface
-        .get_supported_formats(&adapter)
-        .first()
-        .copied()
-        .expect("Get preferred format");
-    (
-        surface,
-        texture_format,
-        adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: Some("Device Descriptor"),
-                    features: adapter_features & wgpu::Features::default(),
-                    limits: wgpu::Limits::default(),
-                },
-                None,
-            )
-            .await
-            .expect("Request device"),
-    )
-}
+const DATA_PER_PIXEL: u32 = 4;
+const U8_SIZE: u32 = std::mem::size_of::<u8>() as u32;
 
 pub struct Runtime {
+    captured_callback: Option<(Viewport, Box<dyn FnOnce(u32, u32, Vec<u8>)>)>,
     device: wgpu::Device,
     format: wgpu::TextureFormat,
     is_paused: bool,
@@ -63,7 +23,9 @@ pub struct Runtime {
     sampler: wgpu::Sampler,
     shader_vert: String,
     surface: wgpu::Surface,
+    surface_texture: Option<wgpu::SurfaceTexture>,
     texture_bind_groups: Vec<(wgpu::BindGroupLayout, wgpu::BindGroup)>,
+    texture_view: Option<wgpu::TextureView>,
     time_instant: PausableInstant,
     uniform: Uniform,
     uniform_bind_group: wgpu::BindGroup,
@@ -110,6 +72,7 @@ impl Runtime {
         )?;
 
         Ok(Self {
+            captured_callback: None,
             device,
             format,
             is_paused: false,
@@ -118,7 +81,9 @@ impl Runtime {
             sampler,
             shader_vert: shader_vert.to_string(),
             surface,
+            surface_texture: None,
             texture_bind_groups,
+            texture_view: None,
             time_instant: PausableInstant::now(),
             uniform,
             uniform_bind_group,
@@ -157,14 +122,44 @@ impl Runtime {
         self.format
     }
 
-    pub fn get_surface(&self) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView)> {
+    pub fn frame_finish(&mut self) -> Result<()> {
+        if self.surface_texture.is_none() {
+            bail!("No actived wgpu::SurfaceTexture found.")
+        }
+
+        if let Some(surface_texture) = self.surface_texture.take() {
+            if let Some((viewport, callback)) = self.captured_callback.take() {
+                let (width, height, buffer) = futures::executor::block_on(
+                    self.capture_image(&viewport, surface_texture.texture.as_image_copy()),
+                )?;
+
+                callback(width, height, buffer);
+            }
+
+            surface_texture.present();
+        }
+
+        Ok(())
+    }
+
+    pub fn frame_start(&mut self) -> Result<()> {
+        if self.surface_texture.is_some() {
+            bail!("Non-finished wgpu::SurfaceTexture found.")
+        }
+
         let surface_texture = self.surface.get_current_texture()?;
 
-        let texture_view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        self.surface_texture = Some(surface_texture);
 
-        Ok((surface_texture, texture_view))
+        if let Some(surface_texture) = &self.surface_texture {
+            self.texture_view = Some(
+                surface_texture
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default()),
+            );
+        }
+
+        Ok(())
     }
 
     pub fn is_paused(&self) -> bool {
@@ -182,8 +177,7 @@ impl Runtime {
     }
 
     pub fn pop_error_scope(&mut self) -> Option<wgpu::Error> {
-        let error_scope =
-            futures::executor::block_on(async { self.device.pop_error_scope().await });
+        let error_scope = futures::executor::block_on(self.device.pop_error_scope());
 
         self.device.push_error_scope(wgpu::ErrorFilter::Validation);
 
@@ -194,7 +188,13 @@ impl Runtime {
         self.texture_bind_groups.remove(index);
     }
 
-    pub fn render(&mut self, view: &wgpu::TextureView, viewport: &Viewport) -> Result<()> {
+    pub fn render(&mut self, viewport: &Viewport) -> Result<()> {
+        if self.texture_view.is_none() {
+            bail!("No actived wgpu::TextureView found.")
+        }
+
+        let view = self.texture_view.as_ref().unwrap();
+
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -210,7 +210,7 @@ impl Runtime {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Load,
@@ -246,18 +246,31 @@ impl Runtime {
 
     pub fn render_with<F>(&mut self, mut f: F) -> Result<()>
     where
-        F: FnMut(&wgpu::Device, &wgpu::Queue) -> Result<()>,
+        F: FnMut(&wgpu::Device, &wgpu::Queue, &wgpu::TextureView) -> Result<()>,
     {
-        f(&self.device, &self.queue)?;
+        if self.texture_view.is_none() {
+            bail!("No actived wgpu::TextureView found.")
+        }
+
+        let view = self.texture_view.as_ref().unwrap();
+
+        f(&self.device, &self.queue, view)?;
 
         Ok(())
+    }
+
+    pub fn request_capture_image<F>(&mut self, viewport: &Viewport, f: F)
+    where
+        F: FnOnce(u32, u32, Vec<u8>) + 'static,
+    {
+        self.captured_callback = Some((viewport.clone(), Box::new(f)));
     }
 
     pub fn resize(&mut self, width: f32, height: f32) {
         self.surface.configure(
             &self.device,
             &wgpu::SurfaceConfiguration {
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
                 format: self.format,
                 width: width as u32,
                 height: height as u32,
@@ -346,6 +359,60 @@ impl Runtime {
         self.uniform.mouse_down = 0;
         self.uniform.mouse_release = self.uniform.cursor;
     }
+
+    async fn capture_image(
+        &mut self,
+        viewport: &Viewport,
+        image_texture: wgpu::ImageCopyTexture<'_>,
+    ) -> Result<(u32, u32, Vec<u8>)> {
+        let width = viewport.width as u32;
+        let height = viewport.height as u32;
+
+        let align_width = align_up(
+            width * DATA_PER_PIXEL * U8_SIZE,
+            wgpu::COPY_BYTES_PER_ROW_ALIGNMENT,
+        ) / U8_SIZE;
+
+        let texture_size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Capture Encoder"),
+            });
+
+        let output_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Buffer"),
+            size: (align_width * height) as wgpu::BufferAddress,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
+        let image_buffer = wgpu::ImageCopyBuffer {
+            buffer: &output_buffer,
+            layout: wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(align_width),
+                rows_per_image: std::num::NonZeroU32::new(height),
+            },
+        };
+
+        encoder.copy_texture_to_buffer(image_texture, image_buffer, texture_size);
+
+        self.queue.submit(Some(encoder.finish()));
+
+        let buffer = view_into_buffer(&self.device, viewport, &output_buffer).await?;
+
+        Ok((width, height, buffer))
+    }
+}
+
+fn align_up(num: u32, align: u32) -> u32 {
+    (num + align - 1) & !(align - 1)
 }
 
 fn build_pipeline(
@@ -484,6 +551,50 @@ fn create_texture(
     (texture_bind_group_layout, texture_bind_group)
 }
 
+async fn init_device<W>(
+    w: &W,
+) -> (
+    wgpu::Surface,
+    wgpu::TextureFormat,
+    (wgpu::Device, wgpu::Queue),
+)
+where
+    W: raw_window_handle::HasRawWindowHandle + raw_window_handle::HasRawDisplayHandle,
+{
+    let default_backend = wgpu::Backends::PRIMARY;
+    let backend = wgpu::util::backend_bits_from_env().unwrap_or(default_backend);
+    let instance = wgpu::Instance::new(backend);
+    let surface = unsafe { instance.create_surface(w) };
+
+    let adapter =
+        wgpu::util::initialize_adapter_from_env_or_default(&instance, backend, Some(&surface))
+            .await
+            .expect("No suitable GPU adapters found on the system!");
+
+    let adapter_features = adapter.features();
+
+    let texture_format = surface
+        .get_supported_formats(&adapter)
+        .first()
+        .copied()
+        .expect("Get preferred format");
+    (
+        surface,
+        texture_format,
+        adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: Some("Device Descriptor"),
+                    features: adapter_features & wgpu::Features::default(),
+                    limits: wgpu::Limits::default(),
+                },
+                None,
+            )
+            .await
+            .expect("Request device"),
+    )
+}
+
 fn setup_uniform(
     device: &wgpu::Device,
 ) -> (
@@ -530,4 +641,49 @@ fn setup_uniform(
         uniform_bind_group_layout,
         uniform_bind_group,
     )
+}
+
+fn trim_image_buffer(width: u32, height: u32, buffer: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity((width * height) as usize);
+
+    let align_width = buffer.len() / height as usize;
+
+    for i in 0..height as usize {
+        for j in 0..width as usize {
+            output.push(buffer[i * align_width + j]);
+        }
+    }
+
+    output
+}
+
+async fn view_into_buffer(
+    device: &wgpu::Device,
+    viewport: &Viewport,
+    raw_buffer: &wgpu::Buffer,
+) -> Result<Vec<u8>> {
+    let slice = raw_buffer.slice(..);
+
+    let (sender, receiver) = futures::channel::oneshot::channel();
+
+    slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
+
+    device.poll(wgpu::Maintain::Wait);
+
+    if let std::result::Result::Ok(_) = receiver.await {
+        let buffer_view = slice.get_mapped_range();
+
+        let buffer = trim_image_buffer(
+            DATA_PER_PIXEL * viewport.width as u32,
+            viewport.height as u32,
+            &buffer_view,
+        );
+
+        drop(buffer_view);
+        raw_buffer.unmap();
+
+        Ok(buffer)
+    } else {
+        bail!("Failed to map the buffer.")
+    }
 }

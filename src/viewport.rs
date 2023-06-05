@@ -1,4 +1,4 @@
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Viewport {
     pub x: f32,
     pub y: f32,

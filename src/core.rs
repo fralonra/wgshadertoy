@@ -11,7 +11,7 @@ use crate::{
 use anyhow::Result;
 use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
 use egui_winit::State;
-use image::ImageResult;
+use image::{ColorType, ImageResult};
 use std::{
     fs::read,
     io::{self, Cursor},
@@ -124,6 +124,26 @@ impl Core {
         let mut need_update = false;
 
         match event {
+            UserEvent::CaptureImage => {
+                let half_width = self.size.0 / 2.0;
+
+                let viewport = Viewport {
+                    x: half_width,
+                    width: half_width,
+                    height: self.size.1,
+                    ..Default::default()
+                };
+
+                let filename = format!(
+                    "Capture_{}.{}",
+                    self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
+                    "png"
+                );
+                self.runtime
+                    .request_capture_image(&viewport, move |width, height, buffer| {
+                        on_image_captured(width, height, buffer, &filename);
+                    });
+            }
             UserEvent::ChangeTexture(index) => {
                 let path = select_texture();
                 if path.is_some() {
@@ -135,9 +155,7 @@ impl Core {
                             self.ui.change_texture(index, width, height, &data);
                             self.wgs_data.change_texture(index, width, height, data);
                         }
-                        Err(err) => {
-                            log::error!("Failed to open texture: {}", err);
-                        }
+                        Err(err) => log::error!("Failed to open texture: {}", err),
                     }
                 } else {
                     self.runtime.remove_texture(index);
@@ -316,9 +334,9 @@ impl Core {
     }
 
     fn render(&mut self, window: &Window) -> Result<()> {
-        let half_width = self.size.0 / 2.0;
+        self.runtime.frame_start()?;
 
-        let (surface_texture, texture_view) = self.runtime.get_surface()?;
+        let half_width = self.size.0 / 2.0;
 
         if !self.has_validation_error {
             let viewport = Viewport {
@@ -327,7 +345,7 @@ impl Core {
                 height: self.size.1,
                 ..Default::default()
             };
-            self.runtime.render(&texture_view, &viewport)?;
+            self.runtime.render(&viewport)?;
         }
 
         {
@@ -362,7 +380,7 @@ impl Core {
                 ..Default::default()
             };
 
-            self.runtime.render_with(|device, queue| {
+            self.runtime.render_with(|device, queue, view| {
                 self.ui_render_pass
                     .add_textures(device, queue, &full_output.textures_delta)?;
 
@@ -387,7 +405,7 @@ impl Core {
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Egui Main Render Pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &texture_view,
+                            view,
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Load,
@@ -421,7 +439,7 @@ impl Core {
             })?;
         }
 
-        surface_texture.present();
+        self.runtime.frame_finish()?;
 
         Ok(())
     }
@@ -508,6 +526,15 @@ fn load_wgs(path: PathBuf) -> io::Result<WgsData> {
     log::info!("Opened wgs file: {:?}", path);
 
     Ok(WgsData::load(&mut reader).unwrap())
+}
+
+fn on_image_captured(width: u32, height: u32, buffer: Vec<u8>, filename: &str) {
+    if let Some(path) = create_file(filename) {
+        match image::save_buffer(path.clone(), &buffer, width, height, ColorType::Rgba8) {
+            Ok(()) => log::info!("Saving image file: {:?}", path),
+            Err(err) => log::error!("Failed to save image: {}", err),
+        }
+    }
 }
 
 fn open_image(path: PathBuf) -> ImageResult<(u32, u32, Vec<u8>)> {

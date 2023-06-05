@@ -128,6 +128,9 @@ impl Ui {
                 if ui.button("Compile").clicked() {
                     event_proxy.send_event(UserEvent::RequestRedraw);
                 }
+                if ui.button("Capture Image").clicked() {
+                    event_proxy.send_event(UserEvent::CaptureImage);
+                }
 
                 ui.separator();
 
@@ -137,8 +140,6 @@ impl Ui {
                 if ui.button("Open").clicked() {
                     event_proxy.send_event(UserEvent::OpenFile);
                 }
-
-                ui.separator();
 
                 if ui.button("Save").clicked() {
                     event_proxy.send_event(UserEvent::SaveFile);
