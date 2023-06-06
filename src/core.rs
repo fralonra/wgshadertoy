@@ -139,10 +139,16 @@ impl Core {
                     self.wgs_data.name().to_ascii_lowercase().replace(" ", "_"),
                     "png"
                 );
-                self.runtime
-                    .request_capture_image(&viewport, move |width, height, buffer| {
+                self.runtime.request_capture_image(
+                    &viewport,
+                    move |runtime, width, height, buffer| {
+                        runtime.pause();
+
                         on_image_captured(width, height, buffer, &filename);
-                    });
+
+                        runtime.resume();
+                    },
+                );
             }
             UserEvent::ChangeTexture(index) => {
                 let path = select_texture();

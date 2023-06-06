@@ -14,7 +14,7 @@ const DATA_PER_PIXEL: u32 = 4;
 const U8_SIZE: u32 = std::mem::size_of::<u8>() as u32;
 
 pub struct Runtime {
-    captured_callback: Option<(Viewport, Box<dyn FnOnce(u32, u32, Vec<u8>)>)>,
+    captured_callback: Option<(Viewport, Box<dyn FnOnce(&mut Self, u32, u32, Vec<u8>)>)>,
     device: wgpu::Device,
     format: wgpu::TextureFormat,
     is_paused: bool,
@@ -142,7 +142,7 @@ impl Runtime {
                     texture.as_image_copy(),
                 ))?;
 
-                callback(width, height, buffer);
+                callback(self, width, height, buffer);
             }
 
             surface_texture.present();
@@ -270,7 +270,7 @@ impl Runtime {
 
     pub fn request_capture_image<F>(&mut self, viewport: &Viewport, f: F)
     where
-        F: FnOnce(u32, u32, Vec<u8>) + 'static,
+        F: FnOnce(&mut Self, u32, u32, Vec<u8>) + 'static,
     {
         self.captured_callback = Some((viewport.clone(), Box::new(f)));
     }
