@@ -316,10 +316,11 @@ impl Core {
         request_redraw
     }
 
-    pub fn resize(&mut self, width: f32, height: f32) {
+    pub fn resize(&mut self, width: f32, height: f32, scale_factor: f32) {
         self.size = (width, height);
 
         self.runtime.resize(width, height);
+        self.state.set_pixels_per_point(scale_factor);
     }
 
     pub fn update_cursor(&mut self, x: f32, y: f32) {

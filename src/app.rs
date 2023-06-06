@@ -8,6 +8,11 @@ use winit::{
     window::{Icon, Window, WindowBuilder},
 };
 
+const RECOMMAND_HEIGHT: f64 = 720.0;
+const RECOMMAND_WIDTH: f64 = 1280.0;
+
+const RECOMMAND_SIZE: Size = Size::Logical(LogicalSize::new(RECOMMAND_WIDTH, RECOMMAND_HEIGHT));
+
 pub struct App {
     core: Core,
     event_loop: EventLoop<UserEvent>,
@@ -20,9 +25,12 @@ impl App {
 
         let window = WindowBuilder::new()
             .with_min_inner_size(Size::Logical(LogicalSize::new(720.0, 360.0)))
+            .with_inner_size(RECOMMAND_SIZE)
             .with_title(format_title(&None))
             .with_window_icon(window_icon())
             .build(&event_loop)?;
+
+        try_resize_window(&window);
 
         let inner_size = window.inner_size();
 
@@ -70,9 +78,25 @@ impl App {
                             _ => {}
                         },
                         WindowEvent::Resized(physical_size) => {
-                            self.core
-                                .resize(physical_size.width as f32, physical_size.height as f32);
+                            self.core.resize(
+                                physical_size.width as f32,
+                                physical_size.height as f32,
+                                self.window.scale_factor() as f32,
+                            );
+
                             self.window.request_redraw();
+                        }
+                        WindowEvent::ScaleFactorChanged {
+                            scale_factor,
+                            new_inner_size,
+                        } => {
+                            try_resize_window(&self.window);
+
+                            self.core.resize(
+                                new_inner_size.width as f32,
+                                new_inner_size.height as f32,
+                                *scale_factor as f32,
+                            );
                         }
                         _ => {}
                     }
@@ -102,6 +126,17 @@ fn format_title(file_path: &Option<PathBuf>) -> String {
             None => "Untitled".to_owned(),
         }
     )
+}
+
+fn try_resize_window(window: &Window) {
+    if let Some(monitor) = window.current_monitor() {
+        let monitor_size = monitor.size();
+        let outer_size = window.outer_size();
+
+        if monitor_size.width <= outer_size.width || monitor_size.height <= outer_size.height {
+            window.set_maximized(true);
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]
