@@ -124,7 +124,10 @@ impl Ui {
 
         CentralPanel::default().show(ctx, |ui| {
             widgets::global_dark_light_mode_switch(ui);
-            ui.horizontal(|ui| {
+
+            ui.horizontal_wrapped(|ui| {
+                ui.set_max_width(ui.available_width() / 2.0);
+
                 if ui.button("Compile").clicked() {
                     event_proxy.send_event(UserEvent::RequestRedraw);
                 }
@@ -168,7 +171,9 @@ impl Ui {
                 }
             });
 
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.set_max_width(ui.available_width() / 2.0);
+
                 ui.label("Name: ");
                 ui.text_edit_singleline(&mut edit_context.name);
             });

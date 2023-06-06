@@ -1,5 +1,5 @@
 use super::TokenType;
-use egui::{Color32, Context, FontId, Id, Style, TextFormat};
+use egui::{Color32, Context, FontId, Style, TextFormat};
 
 #[derive(Clone, Hash, PartialEq)]
 pub struct CodeTheme {
