@@ -7,7 +7,7 @@
   <key>CFBundleExecutable</key>
   <string>wgshadertoy</string>
   <key>CFBundleIdentifier</key>
-  <string>org.wgshadertoy</string>
+  <string>io.github.fralonra.WgShadertoy</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
