@@ -200,9 +200,9 @@ dependencies = [
 
 [[package]]
 name = "binrw"
-version = "0.10.0"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f846d8732b2a55b569b885852ecc925a2b1f24568f4707f8b1ccd5dc6805ea9b"
+checksum = "ab81d22cbd2d745852348b2138f3db2103afa8ce043117a374581926a523e267"
 dependencies = [
  "array-init",
  "binrw_derive",
@@ -211,9 +211,9 @@ dependencies = [
 
 [[package]]
 name = "binrw_derive"
-version = "0.10.0"
+version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2aa66a5e35daf7f91ed44c945886597ef4c327f34f68b6bbf22951a250ceeb"
+checksum = "d6b019a3efebe7f453612083202887b6f1ace59e20d010672e336eea4ed5be97"
 dependencies = [
  "either",
  "owo-colors",
@@ -2446,22 +2446,55 @@ dependencies = [
 ]
 
 [[package]]
+name = "wgs_core"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d239405b7aa060a4bf3dc2124a3bf989c6e162417024de731fffb92028c3097d"
+dependencies = [
+ "binrw",
+]
+
+[[package]]
+name = "wgs_runtime_base"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a1ea52f46b823980ea9c69e3255ecbcbf247cd78c0693413f9d91e78f40e152"
+dependencies = [
+ "anyhow",
+ "wgs_core",
+]
+
+[[package]]
+name = "wgs_runtime_wgpu"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e3d9690a7251d65bf248d0a0a2ebf58f140f67c7e25031f42764ee7606f4b1c"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "futures",
+ "raw-window-handle",
+ "wgpu",
+ "wgs_core",
+ "wgs_runtime_base",
+]
+
+[[package]]
 name = "wgshadertoy"
 version = "0.2.1"
 dependencies = [
  "anyhow",
- "binrw",
- "bytemuck",
  "egui",
  "egui-winit",
  "egui_wgpu_backend",
  "env_logger",
- "futures",
  "image",
  "log",
  "raw-window-handle",
  "rfd",
  "wgpu",
+ "wgs_core",
+ "wgs_runtime_wgpu",
  "winit",
 ]
 
