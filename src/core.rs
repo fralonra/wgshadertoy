@@ -6,7 +6,8 @@ use crate::{
     ui::{EditContext, Ui, UiState},
 };
 use anyhow::Result;
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
+use egui::ClippedPrimitive;
+use egui_wgpu::{renderer::ScreenDescriptor, Renderer};
 use egui_winit::State;
 use image::{ColorType, ImageResult};
 use std::{
@@ -32,7 +33,7 @@ pub struct Core {
     status_clock: Instant,
     ui: Ui,
     ui_edit_context: EditContext,
-    ui_render_pass: RenderPass,
+    ui_renderer: Renderer,
     wgs_path: Option<PathBuf>,
 }
 
@@ -72,7 +73,7 @@ impl Core {
 
         let runtime = Runtime::new(w, wgs, Some(viewport))?;
 
-        let ui_render_pass = RenderPass::new(runtime.device_ref(), runtime.format(), 1);
+        let ui_renderer = Renderer::new(runtime.device_ref(), runtime.format(), None, 1);
 
         let event_proxy = event_loop.create_proxy();
         let event_proxy = EventProxyWinit::from_proxy(event_proxy);
@@ -92,7 +93,7 @@ impl Core {
             status_clock: Instant::now(),
             ui,
             ui_edit_context,
-            ui_render_pass,
+            ui_renderer,
             wgs_path: None,
         })
     }
@@ -361,7 +362,8 @@ impl Core {
                 full_output.platform_output,
             );
 
-            let clipped_primitives = self.ui.context().tessellate(full_output.shapes);
+            let clipped_primitives: &[ClippedPrimitive] =
+                &self.ui.context().tessellate(full_output.shapes);
 
             let viewport = Viewport {
                 width: half_width,
@@ -369,26 +371,27 @@ impl Core {
                 ..Default::default()
             };
 
+            let screen_descriptor = ScreenDescriptor {
+                size_in_pixels: [viewport.width as u32, viewport.height as u32],
+                pixels_per_point: window.scale_factor() as f32,
+            };
+
             self.runtime.render_with(|device, queue, view| {
-                self.ui_render_pass
-                    .add_textures(device, queue, &full_output.textures_delta)?;
-
-                let screen_descriptor = ScreenDescriptor {
-                    physical_width: viewport.width as u32,
-                    physical_height: viewport.height as u32,
-                    scale_factor: window.scale_factor() as f32,
-                };
-
-                self.ui_render_pass.update_buffers(
-                    device,
-                    queue,
-                    &clipped_primitives,
-                    &screen_descriptor,
-                );
+                for (id, delta) in &full_output.textures_delta.set {
+                    self.ui_renderer.update_texture(device, queue, *id, &delta);
+                }
 
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("UI Encoder"),
                 });
+
+                self.ui_renderer.update_buffers(
+                    device,
+                    queue,
+                    &mut encoder,
+                    clipped_primitives,
+                    &screen_descriptor,
+                );
 
                 {
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -413,16 +416,18 @@ impl Core {
                         viewport.max_depth,
                     );
 
-                    self.ui_render_pass
-                        .execute_with_renderpass(
-                            &mut render_pass,
-                            &clipped_primitives,
-                            &screen_descriptor,
-                        )
-                        .unwrap();
+                    self.ui_renderer.render(
+                        &mut render_pass,
+                        clipped_primitives,
+                        &screen_descriptor,
+                    );
                 }
 
                 queue.submit(Some(encoder.finish()));
+
+                for id in &full_output.textures_delta.free {
+                    self.ui_renderer.free_texture(id);
+                }
 
                 Ok(())
             })?;
