@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="windows-1252"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
-    <Product Name="WgShadertoy" Id="*" UpgradeCode="618addfc-c365-4f47-80e1-ef53f98917dd" Language="1033" Codepage="1252" Version="0.2.1" Manufacturer="fralonra">
+    <Product Name="WgShadertoy" Id="*" UpgradeCode="618addfc-c365-4f47-80e1-ef53f98917dd" Language="1033" Codepage="1252" Version="0.2.2" Manufacturer="fralonra">
         <Package InstallerVersion="200" Compressed="yes" InstallScope="perMachine"/>
         <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
         <Icon Id="WgShadertoy.exe" SourceFile=".\extra\windows\wgshadertoy.ico"/>

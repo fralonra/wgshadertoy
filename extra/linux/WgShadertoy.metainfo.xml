@@ -38,7 +38,7 @@
     <url type="bugtracker">https://github.com/fralonra/wgshadertoy/issues</url>
     <launchable type="desktop-id">io.github.fralonra.WgShadertoy.desktop</launchable>
     <releases>
-        <release version="0.2.1" date="2023-06-06"/>
+        <release version="0.2.2" date="2023-06-08"/>
     </releases>
     <screenshots>
         <screenshot type="default">
