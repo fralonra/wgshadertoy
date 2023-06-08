@@ -15,7 +15,6 @@ use std::{
     path::PathBuf,
     time::Instant,
 };
-use wgpu::SurfaceError;
 use wgs_core::WgsData;
 use wgs_runtime_wgpu::{Runtime, RuntimeExt, Viewport};
 use winit::{event::WindowEvent, event_loop::EventLoop, window::Window};
@@ -220,7 +219,9 @@ impl Core {
                 self.runtime.pause();
             }
             UserEvent::RequestRedraw => {
-                update_result = Some(self.runtime.update_frag(&self.ui_edit_context.frag));
+                self.runtime.set_wgs_frag(&self.ui_edit_context.frag);
+
+                update_result = Some(self.runtime.compile());
             }
             UserEvent::Restart => {
                 self.runtime.restart();
@@ -280,8 +281,8 @@ impl Core {
         }
 
         if let Err(error) = self.render(window) {
-            match error.downcast_ref::<SurfaceError>() {
-                Some(SurfaceError::OutOfMemory) => {
+            match error.downcast_ref::<wgpu::SurfaceError>() {
+                Some(wgpu::SurfaceError::OutOfMemory) => {
                     panic!("Swapchain error: {}. Rendering cannot continue.", error)
                 }
                 Some(_) | None => {
@@ -441,7 +442,7 @@ impl Core {
     }
 
     fn save_file_impl(&mut self, save_as: bool) -> Option<String> {
-        self.runtime.update_frag(&self.ui_edit_context.frag);
+        self.runtime.set_wgs_frag(&self.ui_edit_context.frag);
         self.runtime.set_wgs_name(&self.ui_edit_context.name);
 
         let wgs = self.runtime.wgs();
