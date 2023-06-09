@@ -586,6 +586,7 @@ dependencies = [
  "thiserror",
  "type-map",
  "wgpu",
+ "winit",
 ]
 
 [[package]]
@@ -2550,6 +2551,7 @@ dependencies = [
  "egui-wgpu",
  "egui-winit",
  "env_logger",
+ "futures",
  "image",
  "log",
  "raw-window-handle",

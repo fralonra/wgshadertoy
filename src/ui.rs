@@ -23,10 +23,8 @@ pub struct Ui {
 
 impl Ui {
     pub fn new() -> Self {
-        let context = egui::Context::default();
-
         Self {
-            context,
+            context: Context::default(),
             highlighter: Highlighter::default(),
             textures: vec![],
         }
@@ -123,7 +121,13 @@ impl Ui {
         });
 
         CentralPanel::default().show(ctx, |ui| {
-            widgets::global_dark_light_mode_switch(ui);
+            ui.horizontal_wrapped(|ui| {
+                if ui.button("About").clicked() {
+                    event_proxy.send_event(UserEvent::OpenAbout);
+                }
+
+                widgets::global_dark_light_mode_switch(ui);
+            });
 
             ui.horizontal_wrapped(|ui| {
                 ui.set_max_width(ui.available_width() / 2.0);

@@ -13,6 +13,7 @@ pub enum UserEvent {
     CaptureImage,
     ChangeTexture(usize),
     NewFile,
+    OpenAbout,
     OpenFile,
     OpenTexture,
     Pause,
@@ -29,6 +30,7 @@ pub trait EventProxy<T> {
 
 #[derive(Debug, Default)]
 pub struct AppResponse {
+    pub request_open_about: bool,
     pub request_redraw: bool,
     pub set_title: Option<String>,
 }

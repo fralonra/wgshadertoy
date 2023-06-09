@@ -173,6 +173,9 @@ impl Core {
 
                 response.set_title = Some(format_title(&self.wgs_path));
             }
+            UserEvent::OpenAbout => {
+                response.request_open_about = true;
+            }
             UserEvent::OpenFile => {
                 let path = select_file();
                 if path.is_some() {
@@ -260,13 +263,11 @@ impl Core {
         response
     }
 
-    pub fn handle_window_event(&mut self, event: &WindowEvent) {
-        self.state.on_event(self.ui.context(), event);
+    pub fn handle_window_event(&mut self, event: &WindowEvent) -> bool {
+        self.state.on_event(self.ui.context(), event).repaint
     }
 
-    pub fn redraw(&mut self, window: &Window) -> bool {
-        let mut request_redraw = false;
-
+    pub fn redraw(&mut self, window: &Window) {
         if self.status_clock.elapsed().as_secs() > 5 {
             self.status = AppStatus::Idle;
         }
@@ -288,15 +289,12 @@ impl Core {
                 }
                 Some(_) | None => {
                     log::warn!("Failed to render: {}", error);
-                    request_redraw = true;
                 }
             }
         }
 
         #[cfg(feature = "fps")]
         log::info!("FPS: {}", self.fps_counter.tick());
-
-        request_redraw
     }
 
     pub fn resize(&mut self, width: f32, height: f32, scale_factor: f32) {

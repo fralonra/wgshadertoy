@@ -1,11 +1,11 @@
-use crate::{core::Core, event::UserEvent};
+use crate::{about::AboutWindow, core::Core, event::UserEvent, window::WindowExt};
 use anyhow::Result;
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 use winit::{
     dpi::{LogicalSize, Size},
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder},
-    window::{Icon, Window, WindowBuilder},
+    window::{Icon, Window, WindowBuilder, WindowId},
 };
 
 const RECOMMAND_HEIGHT: f64 = 720.0;
@@ -16,6 +16,7 @@ const RECOMMAND_SIZE: Size = Size::Logical(LogicalSize::new(RECOMMAND_WIDTH, REC
 pub struct App {
     core: Core,
     event_loop: EventLoop<UserEvent>,
+    sub_window_map: HashMap<WindowId, Box<dyn WindowExt<UserEvent>>>,
     window: Window,
 }
 
@@ -45,64 +46,109 @@ impl App {
         Ok(Self {
             core,
             event_loop,
+            sub_window_map: HashMap::new(),
             window,
         })
     }
 
     pub fn run(mut self) {
-        self.event_loop.run(move |event, _, control_flow| {
+        self.event_loop.run(move |event, event_loop, control_flow| {
             *control_flow = ControlFlow::Poll;
 
             match event {
                 Event::MainEventsCleared => self.window.request_redraw(),
-                Event::RedrawRequested(_) => {
-                    if self.core.redraw(&self.window) {
-                        self.window.request_redraw();
+                Event::RedrawRequested(window_id) => {
+                    if window_id == self.window.id() {
+                        self.core.redraw(&self.window);
+                    } else {
+                        if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                            window.render();
+                        }
                     }
                 }
                 Event::WindowEvent {
                     ref event,
                     window_id,
-                } if window_id == self.window.id() => {
-                    self.core.handle_window_event(event);
+                } => {
+                    if window_id == self.window.id() {
+                        self.core.handle_window_event(event);
+                    } else {
+                        if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                            if window.handle_window_event(event) {
+                                window.request_redraw();
+                            }
+                        }
+                    }
 
                     match event {
-                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                        WindowEvent::CursorMoved { position, .. } => self
-                            .core
-                            .update_cursor(position.x as f32, position.y as f32),
-                        WindowEvent::MouseInput { button, state, .. } => match button {
-                            MouseButton::Left => self
-                                .core
-                                .handle_mouse_input(*state == ElementState::Pressed),
-                            _ => {}
-                        },
-                        WindowEvent::Resized(physical_size) => {
-                            self.core.resize(
-                                physical_size.width as f32,
-                                physical_size.height as f32,
-                                self.window.scale_factor() as f32,
-                            );
+                        WindowEvent::CloseRequested => {
+                            if window_id == self.window.id() {
+                                self.sub_window_map.clear();
 
-                            self.window.request_redraw();
+                                *control_flow = ControlFlow::Exit;
+                            } else {
+                                self.sub_window_map.remove(&window_id);
+                            }
+                        }
+                        WindowEvent::CursorMoved { position, .. } => {
+                            if window_id == self.window.id() {
+                                self.core
+                                    .update_cursor(position.x as f32, position.y as f32)
+                            }
+                        }
+                        WindowEvent::MouseInput { button, state, .. } => {
+                            if window_id == self.window.id() {
+                                match button {
+                                    MouseButton::Left => self
+                                        .core
+                                        .handle_mouse_input(*state == ElementState::Pressed),
+                                    _ => {}
+                                }
+                            }
+                        }
+                        WindowEvent::Resized(physical_size) => {
+                            if window_id == self.window.id() {
+                                self.core.resize(
+                                    physical_size.width as f32,
+                                    physical_size.height as f32,
+                                    self.window.scale_factor() as f32,
+                                );
+                            } else {
+                                if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                                    window.on_resized(physical_size.width, physical_size.height);
+                                }
+                            }
                         }
                         WindowEvent::ScaleFactorChanged {
                             scale_factor,
                             new_inner_size,
                         } => {
-                            try_resize_window(&self.window);
+                            if window_id == self.window.id() {
+                                try_resize_window(&self.window);
 
-                            self.core.resize(
-                                new_inner_size.width as f32,
-                                new_inner_size.height as f32,
-                                *scale_factor as f32,
-                            );
+                                self.core.resize(
+                                    new_inner_size.width as f32,
+                                    new_inner_size.height as f32,
+                                    *scale_factor as f32,
+                                );
+                            } else {
+                                if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                                    window.on_scaled(*scale_factor as f32);
+                                }
+                            }
                         }
                         _ => {}
                     }
                 }
                 Event::UserEvent(event) => {
                     let response = self.core.handle_user_event(event);
+
+                    if response.request_open_about {
+                        if let Ok(sub_window) = AboutWindow::new(event_loop, None) {
+                            self.sub_window_map
+                                .insert(sub_window.window_id(), Box::new(sub_window));
+                        }
+                    }
 
                     if let Some(title) = response.set_title {
                         self.window.set_title(&title);
