@@ -1,11 +1,13 @@
-use crate::{about::AboutWindow, core::Core, event::UserEvent, window::WindowExt};
+use crate::{
+    about::AboutWindow, core::Core, event::UserEvent, window::WindowExt, window_icon::window_icon,
+};
 use anyhow::Result;
 use std::{collections::HashMap, path::PathBuf};
 use winit::{
     dpi::{LogicalSize, Size},
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder},
-    window::{Icon, Window, WindowBuilder, WindowId},
+    window::{Window, WindowBuilder, WindowId},
 };
 
 const RECOMMAND_HEIGHT: f64 = 720.0;
@@ -183,33 +185,4 @@ fn try_resize_window(window: &Window) {
             window.set_maximized(true);
         }
     }
-}
-
-#[cfg(target_os = "macos")]
-fn window_icon() -> Option<Icon> {
-    None
-}
-
-#[cfg(not(target_os = "macos"))]
-fn window_icon() -> Option<Icon> {
-    match window_icon_from_memory(include_bytes!("../extra/windows/wgshadertoy.ico")) {
-        Ok(icon) => Some(icon),
-        Err(err) => {
-            log::warn!("Failed to load window icon: {}", err);
-            None
-        }
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-fn window_icon_from_memory(raw: &[u8]) -> Result<Icon> {
-    let image = image::load_from_memory(raw)?;
-
-    let image = image.into_rgba8();
-
-    let (width, height) = image.dimensions();
-
-    let icon = Icon::from_rgba(image.into_raw(), width, height)?;
-
-    Ok(icon)
 }

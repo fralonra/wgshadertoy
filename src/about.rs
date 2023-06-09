@@ -1,4 +1,7 @@
-use crate::{egui_winit_wgpu_context::EguiWinitWgpuContext, event::UserEvent, window::WindowExt};
+use crate::{
+    egui_winit_wgpu_context::EguiWinitWgpuContext, event::UserEvent, window::WindowExt,
+    window_icon::window_icon,
+};
 use anyhow::Result;
 use egui::{CentralPanel, Pos2, Rect, Vec2};
 use raw_window_handle::RawWindowHandle;
@@ -24,7 +27,8 @@ impl WindowExt<UserEvent> for AboutWindow {
     ) -> Result<Self> {
         let mut builder = WindowBuilder::new()
             .with_title("About")
-            .with_inner_size(LogicalSize::new(RECOMMAND_WIDTH, RECOMMAND_HEIGHT));
+            .with_inner_size(LogicalSize::new(RECOMMAND_WIDTH, RECOMMAND_HEIGHT))
+            .with_window_icon(window_icon());
 
         builder = unsafe { builder.with_parent_window(parent) };
 

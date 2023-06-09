@@ -10,6 +10,7 @@ mod fps_counter;
 mod fs;
 mod ui;
 mod window;
+mod window_icon;
 
 fn main() {
     env_logger::init();
