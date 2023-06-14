@@ -71,7 +71,8 @@ impl Core {
             name: wgs.name(),
         };
 
-        let runtime = Runtime::new(w, wgs, Some(viewport))?;
+        let mut runtime = Runtime::new(w, wgs, Some(viewport))?;
+        runtime.resize(width, height);
 
         let ui_renderer = Renderer::new(runtime.device_ref(), runtime.format(), None, 1);
 
