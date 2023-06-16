@@ -8,6 +8,30 @@ A [WGSL](https://www.w3.org/TR/WGSL/) playground inspired by [Shadertoy](https:/
 
 <img src="https://i.ibb.co/D9GT30P/Wg-Shadertoy-Untitled-001.png" alt="preview">
 
+## Installation
+
+Check the [latest release](https://github.com/fralonra/wgshadertoy/releases) for your specific OS.
+
+Currently, `msi` for Windows, `dmg` for MacOS are provided. If you are willing to contribute more packages (such as `deb`, `rpm`...), feel free to open a PR.
+
+### Linux
+
+`wgshadertoy` is available on [Flathub](https://flathub.org/apps/io.github.fralonra.WgShadertoy).
+
+<a href="https://flathub.org/apps/io.github.fralonra.WgShadertoy">
+  <img width="240" alt="Download on Flathub" src="https://dl.flathub.org/assets/badges/flathub-badge-en.png" align="start"/>
+</a>
+
+<a href="https://repology.org/project/wgshadertoy/versions">
+  <img src="https://repology.org/badge/vertical-allrepos/wgshadertoy.svg" alt="Packaging status" align="right">
+</a>
+
+For Arch Linux users, `wgshadertoy` is also available on AUR:
+
+```
+yay -S wgshadertoy
+```
+
 ## Wgs format
 
 The application use a binary format `wgs` to save and load shaders and textures.
@@ -43,18 +67,6 @@ fn main_image(frag_color: vec4<f32>, frag_coord: vec2<f32>) -> vec4<f32> {
     let color = 0.5 + 0.5 * cos(u.time + uv.xyx + vec3(0.0, 2.0, 4.0));
     return vec4(color, 1.0);
 }
-```
-
-## Installation
-
-Check the [latest release](https://github.com/fralonra/wgshadertoy/releases), and download the package for your specific OS.
-
-Currently, msi for Windows, dmg for MacOS and raw executable for Linux are provided. If you are willing to contribute more packages (such as deb, rpm...), feel free to open a PR.
-
-For Arch Linux users, there is already a package named `wgshadertoy` in AUR, just install it:
-
-```
-yay -S wgshadertoy
 ```
 
 ## Limits
