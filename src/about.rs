@@ -28,6 +28,7 @@ impl WindowExt<UserEvent> for AboutWindow {
         let mut builder = WindowBuilder::new()
             .with_title("About")
             .with_inner_size(LogicalSize::new(RECOMMAND_WIDTH, RECOMMAND_HEIGHT))
+            .with_resizable(false)
             .with_window_icon(window_icon());
 
         builder = unsafe { builder.with_parent_window(parent) };
