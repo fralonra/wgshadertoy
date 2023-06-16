@@ -11,18 +11,18 @@
             WgShadertoy is a WGSL playground inspired by Shadertoy.
         </p>
         <p>
-            It uses a binary format <code>wgs</code> to save and load shaders and textures.
+            It uses a binary format 'wgs' to save and load shaders and textures.
         </p>
         <p>
             The runtime currently provides six parameters you can use in your shader as a uniform variable:
         </p>
         <ul>
-            <li><em>cursor</em> <code>vec2</code>: The mouse position in pixels.</li>
-            <li><em>mouse_down</em> <code>u32</code>: Whether the left button of the mouse is down.</li>
-            <li><em>mouse_press</em> <code>vec2</code>: The mouse position in pixels when the left button is pressed.</li>
-            <li><em>mouse_release</em> <code>vec2</code>: The mouse position in pixels when the left button is released.</li>
-            <li><em>resolution</em> <code>vec2</code>: The resolution of the canvas in pixels (width * height).</li>
-            <li><em>time</em> <code>f32</code>: The elapsed time since the shader first ran, in seconds.</li>
+            <li>cursor         vec2   The mouse position in pixels.</li>
+            <li>mouse_down     u32    Whether the left button of the mouse is down.</li>
+            <li>mouse_press    vec2   The mouse position in pixels when the left button is pressed.</li>
+            <li>mouse_release  vec2   The mouse position in pixels when the left button is released.</li>
+            <li>resolution     vec2   The resolution of the canvas in pixels (width * height).</li>
+            <li>time           f32    The elapsed time since the shader first ran, in seconds.</li>
         </ul>
     </description>
     <categories>
@@ -42,10 +42,10 @@
     </releases>
     <screenshots>
         <screenshot type="default">
-            <image>https://i.ibb.co/D9GT30P/Wg-Shadertoy-Untitled-001.png</image>
+            <image>https://i.ibb.co/s33s5kV/Wg-Shadertoy0.png</image>
         </screenshot>
         <screenshot>
-            <image>https://i.ibb.co/QcQcZbC/Wg-Shadertoy-home-zoron-1-wgs-001.png</image>
+            <image>https://i.ibb.co/TrwdKv1/Wg-Shadertoy1.png</image>
         </screenshot>
     </screenshots>
     <content_rating type="oars-1.1" />
