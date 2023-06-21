@@ -2569,18 +2569,18 @@ dependencies = [
 
 [[package]]
 name = "wgs_core"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a3fa59ebc24f7d9c1e8936321d952f5c7f072b05af1b1feaf56c7b55c380ff8"
+checksum = "df5b0600eae8850404bcd46363119a2078d2041e127eb6d5eae5a24d5d4849ff"
 dependencies = [
  "binrw",
 ]
 
 [[package]]
 name = "wgs_runtime_base"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e64a144bf57fbe4bd64914a4601a16495c113c22e7944d371a73b3e3cf59e496"
+checksum = "9263dffc5ab79126ba8f939f05307c42273fbf8d7c0475d4e8d4ba62e120697f"
 dependencies = [
  "anyhow",
  "wgs_core",
@@ -2588,9 +2588,9 @@ dependencies = [
 
 [[package]]
 name = "wgs_runtime_wgpu"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d042ca4c223acbe3a8c098d162919c5f814a21182814d68e28df592fcee4a6ae"
+checksum = "5cd0fddf3976056b1a4c535195905fd15928262c17c493b972f146b44a750856"
 dependencies = [
  "anyhow",
  "bytemuck",
