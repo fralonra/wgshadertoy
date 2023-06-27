@@ -73,6 +73,9 @@ impl WindowExt<UserEvent> for AboutWindow {
                     ui.vertical_centered(|ui| {
                         ui.heading("WgShadertoy");
                         ui.strong(env!("CARGO_PKG_VERSION"));
+                        ui.strong(
+                            option_env!("GIT_COMMIT_HASH").unwrap_or("Git commit hash not found"),
+                        );
                     });
 
                     ui.centered_and_justified(|ui| {
