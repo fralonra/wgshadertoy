@@ -6,8 +6,9 @@
         <Icon Id="WgShadertoy.exe" SourceFile=".\extra\windows\wgshadertoy.ico"/>
         <WixVariable Id="WixUILicenseRtf" Value=".\extra\windows\wix\license.rtf"/>
         <Property Id="ARPPRODUCTICON" Value="wgshadertoy.exe"/>
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
         <MediaTemplate EmbedCab="yes"/>
-        <UIRef Id="WixUI_Minimal"/>
+        <UIRef Id="WixUI_InstallDir"/>
 
         <Feature Id="ProductFeature" Title="ConsoleApp" Level="1">
             <ComponentRef Id="WgShadertoyExe"/>
@@ -19,7 +20,7 @@
         <!-- Create directories -->
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFiles64Folder">
-                <Directory Id="WgShadertoyProgramFiles" Name="WgShadertoy"/>
+                <Directory Id="INSTALLDIR" Name="WgShadertoy"/>
             </Directory>
             <Directory Id="ProgramMenuFolder">
                 <Directory Id="WgShadertoyProgramMenu" Name="WgShadertoy"/>
@@ -27,7 +28,7 @@
         </Directory>
 
         <!-- Application binaries -->
-        <DirectoryRef Id="WgShadertoyProgramFiles">
+        <DirectoryRef Id="INSTALLDIR">
             <Component Id="WgShadertoyExe" Guid="*">
                 <File Id="WgShadertoyExeFile" Source=".\target\release\wgshadertoy.exe" Name="wgshadertoy.exe" KeyPath="yes"/>
             </Component>
@@ -36,16 +37,16 @@
         <DirectoryRef Id="WgShadertoyProgramMenu">
             <!-- Application shortcut -->
             <Component Id="WgShadertoyShortcut" Guid="826d2913-4ba4-4ab2-951e-0506f62522d4">
-                <Shortcut Id="WgShadertoyShortcutFile" Icon="WgShadertoy.exe" Name="WgShadertoy" Description="Description" Target="[WgShadertoyProgramFiles]wgshadertoy.exe"/>
+                <Shortcut Id="WgShadertoyShortcutFile" Icon="WgShadertoy.exe" Name="WgShadertoy" Description="Description" Target="[INSTALLDIR]wgshadertoy.exe"/>
                 <RemoveFolder Id="WgShadertoyProgramMenu" On="uninstall"/>
                 <RegistryValue Root="HKCU" Key="Software\Microsoft\WgShadertoy" Name="installed" Type="integer" Value="1" KeyPath="yes"/>
             </Component>
         </DirectoryRef>
 
-        <DirectoryRef Id="WgShadertoyProgramFiles">
+        <DirectoryRef Id="INSTALLDIR">
             <!-- Add to PATH -->
             <Component Id="ModifyPathEnv" Guid="856af15d-9368-47c9-a6af-8aec2d549619" KeyPath="yes">
-                <Environment Id="PathEnv" Value="[WgShadertoyProgramFiles]" Name="PATH" Permanent="no" Part="first" Action="set" System="yes"/>
+                <Environment Id="PathEnv" Value="[INSTALLDIR]" Name="PATH" Permanent="no" Part="first" Action="set" System="yes"/>
             </Component>
         </DirectoryRef>
 
@@ -53,10 +54,10 @@
             <!-- Add context menu -->
             <Component Id="ContextMenu" Guid="a58956dd-6acc-4d13-a7d4-639595519d29">
                 <RegistryKey Root="HKCU" Key="Software\Classes\Directory\Background\shell\Open WgShadertoy here\command">
-                    <RegistryValue Type="string" Value="[WgShadertoyProgramFiles]wgshadertoy.exe &quot;%V&quot;" KeyPath="yes"/>
+                    <RegistryValue Type="string" Value="[INSTALLDIR]wgshadertoy.exe &quot;%V&quot;" KeyPath="yes"/>
                 </RegistryKey>
                 <RegistryKey Root="HKCU" Key="Software\Classes\Directory\Background\shell\Open WgShadertoy here">
-                    <RegistryValue Type="string" Name="Icon" Value="[WgShadertoyProgramFiles]wgshadertoy.exe"/>
+                    <RegistryValue Type="string" Name="Icon" Value="[INSTALLDIR]wgshadertoy.exe"/>
                 </RegistryKey>
             </Component>
         </DirectoryRef>
