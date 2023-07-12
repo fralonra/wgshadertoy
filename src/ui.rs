@@ -3,7 +3,7 @@ mod image_upload;
 
 use crate::event::{AppStatus, EventProxy, UserEvent};
 use egui::{
-    style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
+    menu, style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
     FontData, FontDefinitions, FontFamily, FullOutput, ImageData, Layout, RawInput, ScrollArea,
     TextEdit, TextureHandle, TextureOptions, TopBottomPanel,
 };
@@ -98,6 +98,48 @@ impl Ui {
         };
 
         let is_dark = ctx.style().visuals.dark_mode;
+
+        TopBottomPanel::top("menu").show(ctx, |ui| {
+            menu::bar(ui, |ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("New").clicked() {
+                        event_proxy.send_event(UserEvent::NewFile);
+
+                        ui.close_menu();
+                    }
+                    if ui.button("Open").clicked() {
+                        event_proxy.send_event(UserEvent::OpenFile);
+
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+
+                    if ui.button("Save").clicked() {
+                        event_proxy.send_event(UserEvent::SaveFile);
+
+                        ui.close_menu();
+                    }
+                    if ui
+                        .add_enabled(state.file_saved, Button::new("Save As"))
+                        .clicked()
+                    {
+                        event_proxy.send_event(UserEvent::SaveFileAs);
+
+                        ui.close_menu();
+                    }
+                });
+
+                ui.menu_button("Help", |ui| {
+                    if ui.button("About").clicked() {
+                        event_proxy.send_event(UserEvent::OpenAbout);
+
+                        ui.close_menu();
+                    }
+                });
+            });
+        });
+
         TopBottomPanel::bottom("status").show(ctx, |ui| match state.status {
             AppStatus::Info(message) => {
                 ui.label(message);
@@ -127,14 +169,6 @@ impl Ui {
 
         CentralPanel::default().show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
-                if ui.button("About").clicked() {
-                    event_proxy.send_event(UserEvent::OpenAbout);
-                }
-
-                widgets::global_dark_light_mode_switch(ui);
-            });
-
-            ui.horizontal_wrapped(|ui| {
                 ui.set_max_width(ui.available_width() / 2.0);
 
                 if ui
@@ -150,25 +184,6 @@ impl Ui {
                     .clicked()
                 {
                     event_proxy.send_event(UserEvent::CaptureImage);
-                }
-
-                ui.separator();
-
-                if ui.button("New").clicked() {
-                    event_proxy.send_event(UserEvent::NewFile);
-                }
-                if ui.button("Open").clicked() {
-                    event_proxy.send_event(UserEvent::OpenFile);
-                }
-
-                if ui.button("Save").clicked() {
-                    event_proxy.send_event(UserEvent::SaveFile);
-                }
-                if ui
-                    .add_enabled(state.file_saved, Button::new("Save As"))
-                    .clicked()
-                {
-                    event_proxy.send_event(UserEvent::SaveFileAs);
                 }
 
                 ui.separator();
@@ -198,6 +213,10 @@ impl Ui {
                         UserEvent::Pause
                     });
                 }
+
+                ui.separator();
+
+                widgets::global_dark_light_mode_buttons(ui);
             });
 
             ui.horizontal_wrapped(|ui| {
