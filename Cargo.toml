@@ -16,6 +16,7 @@ env_logger = "0.9"
 futures = "0.3"
 image = "0.24"
 log = "0.4"
+material-icons = { git = "https://github.com/fschutt/material-icons.git" }
 raw-window-handle = "0.5"
 rfd = "0.10"
 wgpu = "0.16"

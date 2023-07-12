@@ -2,7 +2,7 @@ use anyhow::Result;
 use egui::{ClippedPrimitive, Context};
 use egui_wgpu::{winit::Painter, WgpuConfiguration};
 use egui_winit::State;
-use winit::{event_loop::EventLoopWindowTarget, window::Window};
+use winit::{event::WindowEvent, event_loop::EventLoopWindowTarget, window::Window};
 
 pub struct EguiWinitWgpuContext {
     context: Context,
@@ -26,7 +26,7 @@ impl EguiWinitWgpuContext {
         })
     }
 
-    pub fn handle_window_event(&mut self, event: &winit::event::WindowEvent) -> bool {
+    pub fn handle_window_event(&mut self, event: &WindowEvent) -> bool {
         self.state.on_event(&self.context, event).repaint
     }
 

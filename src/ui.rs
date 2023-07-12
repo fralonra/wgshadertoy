@@ -4,11 +4,12 @@ mod image_upload;
 use crate::event::{AppStatus, EventProxy, UserEvent};
 use egui::{
     style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
-    FullOutput, ImageData, Layout, RawInput, ScrollArea, TextEdit, TextureHandle, TextureOptions,
-    TopBottomPanel,
+    FontData, FontDefinitions, FontFamily, FullOutput, ImageData, Layout, RawInput, ScrollArea,
+    TextEdit, TextureHandle, TextureOptions, TopBottomPanel,
 };
 use highlight::{CodeTheme, Highlighter};
 use image_upload::image_upload;
+use material_icons::{icon_to_char, Icon};
 
 pub struct EditContext {
     pub frag: String,
@@ -23,8 +24,12 @@ pub struct Ui {
 
 impl Ui {
     pub fn new() -> Self {
+        let mut context = Context::default();
+
+        setup_fonts(&mut context);
+
         Self {
-            context: Context::default(),
+            context,
             highlighter: Highlighter::default(),
             textures: vec![],
         }
@@ -132,10 +137,18 @@ impl Ui {
             ui.horizontal_wrapped(|ui| {
                 ui.set_max_width(ui.available_width() / 2.0);
 
-                if ui.button("Compile").clicked() {
+                if ui
+                    .button(icon_to_char(Icon::PlayArrow).to_string())
+                    .on_hover_text("Compile and run")
+                    .clicked()
+                {
                     event_proxy.send_event(UserEvent::RequestRedraw);
                 }
-                if ui.button("Capture Image").clicked() {
+                if ui
+                    .button(icon_to_char(Icon::ScreenshotMonitor).to_string())
+                    .on_hover_text("Capture image")
+                    .clicked()
+                {
                     event_proxy.send_event(UserEvent::CaptureImage);
                 }
 
@@ -160,11 +173,23 @@ impl Ui {
 
                 ui.separator();
 
-                if ui.button("Restart").clicked() {
+                if ui
+                    .button(icon_to_char(Icon::PlayCircleFilled).to_string())
+                    .on_hover_text("Restart")
+                    .clicked()
+                {
                     event_proxy.send_event(UserEvent::Restart);
                 }
                 if ui
-                    .button(if state.is_paused { "Resume" } else { "Pause" })
+                    .button(
+                        icon_to_char(if state.is_paused {
+                            Icon::ReplayCircleFilled
+                        } else {
+                            Icon::PauseCircleFilled
+                        })
+                        .to_string(),
+                    )
+                    .on_hover_text(if state.is_paused { "Resume" } else { "Pause" })
                     .clicked()
                 {
                     event_proxy.send_event(if state.is_paused {
@@ -228,4 +253,25 @@ pub struct UiState {
     pub is_paused: bool,
     pub status: AppStatus,
     pub texture_addable: bool,
+}
+
+fn setup_fonts(ctx: &mut Context) {
+    let mut fonts = FontDefinitions::default();
+
+    const FONT_MATERIAL_ICON: &'static str = "MaterialIcons-Regular";
+
+    fonts.font_data.insert(
+        FONT_MATERIAL_ICON.to_owned(),
+        FontData::from_static(material_icons::FONT),
+    );
+
+    if let Some(vec) = fonts.families.get_mut(&FontFamily::Proportional) {
+        vec.push(FONT_MATERIAL_ICON.to_owned());
+    }
+
+    if let Some(vec) = fonts.families.get_mut(&FontFamily::Monospace) {
+        vec.push(FONT_MATERIAL_ICON.to_owned());
+    }
+
+    ctx.set_fonts(fonts);
 }
