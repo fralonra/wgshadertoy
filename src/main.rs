@@ -8,6 +8,7 @@ mod event;
 #[cfg(feature = "fps")]
 mod fps_counter;
 mod fs;
+mod shortcut;
 mod ui;
 mod window;
 mod window_icon;

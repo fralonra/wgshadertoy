@@ -1,7 +1,10 @@
 mod highlight;
 mod image_upload;
 
-use crate::event::{AppStatus, EventProxy, UserEvent};
+use crate::{
+    event::{AppStatus, EventProxy, UserEvent},
+    shortcut::Shortcut,
+};
 use egui::{
     menu, style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
     FontData, FontDefinitions, FontFamily, FullOutput, ImageData, Layout, RawInput, ScrollArea,
@@ -19,6 +22,7 @@ pub struct EditContext {
 pub struct Ui {
     context: Context,
     highlighter: Highlighter,
+    shortcut: Shortcut,
     textures: Vec<TextureHandle>,
 }
 
@@ -31,6 +35,7 @@ impl Ui {
         Self {
             context,
             highlighter: Highlighter::default(),
+            shortcut: Shortcut::new(),
             textures: vec![],
         }
     }
@@ -88,6 +93,26 @@ impl Ui {
         event_proxy: &impl EventProxy<UserEvent>,
         state: UiState,
     ) {
+        if ctx.input_mut(|i| i.consume_shortcut(&self.shortcut.app_quit)) {
+            event_proxy.send_event(UserEvent::Quit);
+        }
+
+        if ctx.input_mut(|i| i.consume_shortcut(&self.shortcut.file_new)) {
+            event_proxy.send_event(UserEvent::NewFile);
+        }
+
+        if ctx.input_mut(|i| i.consume_shortcut(&self.shortcut.file_open)) {
+            event_proxy.send_event(UserEvent::OpenFile);
+        }
+
+        if ctx.input_mut(|i| i.consume_shortcut(&self.shortcut.file_save)) {
+            event_proxy.send_event(UserEvent::SaveFile);
+        }
+
+        if ctx.input_mut(|i| i.consume_shortcut(&self.shortcut.file_save_as)) {
+            event_proxy.send_event(UserEvent::SaveFileAs);
+        }
+
         let theme = CodeTheme::from_memory(ctx);
 
         let mut layouter = |ui: &egui::Ui, string: &str, wrap_width: f32| {
@@ -102,12 +127,25 @@ impl Ui {
         TopBottomPanel::top("menu").show(ctx, |ui| {
             menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.button("New").clicked() {
+                    if ui
+                        .add(
+                            Button::new("New")
+                                .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.file_new)),
+                        )
+                        .clicked()
+                    {
                         event_proxy.send_event(UserEvent::NewFile);
 
                         ui.close_menu();
                     }
-                    if ui.button("Open").clicked() {
+
+                    if ui
+                        .add(
+                            Button::new("Open")
+                                .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.file_open)),
+                        )
+                        .clicked()
+                    {
                         event_proxy.send_event(UserEvent::OpenFile);
 
                         ui.close_menu();
@@ -115,13 +153,24 @@ impl Ui {
 
                     ui.separator();
 
-                    if ui.button("Save").clicked() {
+                    if ui
+                        .add(
+                            Button::new("Save")
+                                .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.file_save)),
+                        )
+                        .clicked()
+                    {
                         event_proxy.send_event(UserEvent::SaveFile);
 
                         ui.close_menu();
                     }
+
                     if ui
-                        .add_enabled(state.file_saved, Button::new("Save As"))
+                        .add(
+                            Button::new("Save As").shortcut_text(
+                                ui.ctx().format_shortcut(&self.shortcut.file_save_as),
+                            ),
+                        )
                         .clicked()
                     {
                         event_proxy.send_event(UserEvent::SaveFileAs);
@@ -131,7 +180,13 @@ impl Ui {
 
                     ui.separator();
 
-                    if ui.button("Quit").clicked() {
+                    if ui
+                        .add(
+                            Button::new("Quit")
+                                .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.app_quit)),
+                        )
+                        .clicked()
+                    {
                         event_proxy.send_event(UserEvent::Quit);
 
                         ui.close_menu();
