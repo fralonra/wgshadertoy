@@ -128,6 +128,14 @@ impl Ui {
 
                         ui.close_menu();
                     }
+
+                    ui.separator();
+
+                    if ui.button("Quit").clicked() {
+                        event_proxy.send_event(UserEvent::Quit);
+
+                        ui.close_menu();
+                    }
                 });
 
                 ui.menu_button("Help", |ui| {

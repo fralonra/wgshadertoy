@@ -145,6 +145,14 @@ impl App {
                 Event::UserEvent(event) => {
                     let response = self.core.handle_user_event(event);
 
+                    if response.request_quit {
+                        self.sub_window_map.clear();
+
+                        *control_flow = ControlFlow::Exit;
+
+                        return;
+                    }
+
                     if response.request_open_about {
                         if let Ok(sub_window) = AboutWindow::new(event_loop, None) {
                             self.sub_window_map

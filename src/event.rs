@@ -17,6 +17,7 @@ pub enum UserEvent {
     OpenFile,
     OpenTexture,
     Pause,
+    Quit,
     RequestRedraw,
     Restart,
     Resume,
@@ -31,6 +32,7 @@ pub trait EventProxy<T> {
 #[derive(Debug, Default)]
 pub struct AppResponse {
     pub request_open_about: bool,
+    pub request_quit: bool,
     pub request_redraw: bool,
     pub set_title: Option<String>,
 }

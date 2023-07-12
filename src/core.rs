@@ -223,6 +223,9 @@ impl Core {
             UserEvent::Pause => {
                 self.runtime.pause();
             }
+            UserEvent::Quit => {
+                response.request_quit = true;
+            }
             UserEvent::RequestRedraw => {
                 self.runtime.set_wgs_frag(&self.ui_edit_context.frag);
 
