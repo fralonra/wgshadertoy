@@ -1,8 +1,12 @@
 use crate::{
-    about::AboutWindow, core::Core, event::UserEvent, window::WindowExt, window_icon::window_icon,
+    about::AboutWindow,
+    core::{format_title, Core},
+    event::UserEvent,
+    window::WindowExt,
+    window_icon::window_icon,
 };
 use anyhow::Result;
-use std::{collections::HashMap, path::PathBuf};
+use std::collections::HashMap;
 use winit::{
     dpi::{LogicalSize, Size},
     event::{ElementState, Event, MouseButton, WindowEvent},
@@ -172,16 +176,6 @@ impl App {
             }
         });
     }
-}
-
-fn format_title(file_path: &Option<PathBuf>) -> String {
-    format!(
-        "WgShadertoy - {}",
-        match file_path {
-            Some(file_path) => file_path.display().to_string(),
-            None => "Untitled".to_owned(),
-        }
-    )
 }
 
 fn try_resize_window(window: &Window) {

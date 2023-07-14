@@ -13,7 +13,7 @@ use image::{ColorType, ImageResult};
 use std::{
     fs::read,
     io::{self, Cursor},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::Instant,
 };
 use wgs_core::WgsData;
@@ -146,10 +146,7 @@ impl Core {
                 );
             }
             UserEvent::ChangeTexture(index) => {
-                let path = select_texture();
-                if path.is_some() {
-                    let path = path.unwrap();
-
+                if let Some(path) = select_texture() {
                     match open_image(path) {
                         Ok((width, height, data)) => {
                             self.ui.change_texture(index, width, height, &data);
@@ -175,10 +172,8 @@ impl Core {
                 response.request_open_about = true;
             }
             UserEvent::OpenFile => {
-                let path = select_file();
-                if path.is_some() {
-                    let path = path.unwrap();
-                    match load_wgs(path.clone()) {
+                if let Some(path) = select_file() {
+                    match load_wgs(&path) {
                         Ok(wgs) => {
                             self.wgs_path = Some(path);
 
@@ -202,10 +197,7 @@ impl Core {
                 }
             }
             UserEvent::OpenTexture => {
-                let path = select_texture();
-                if path.is_some() {
-                    let path = path.unwrap();
-
+                if let Some(path) = select_texture() {
                     match open_image(path) {
                         Ok((width, height, data)) => {
                             self.ui.add_texture(width, height, &data);
@@ -492,7 +484,7 @@ impl Core {
     }
 }
 
-fn format_title(file_path: &Option<PathBuf>) -> String {
+pub fn format_title(file_path: &Option<PathBuf>) -> String {
     format!(
         "WgShadertoy - {}",
         match file_path {
@@ -502,25 +494,31 @@ fn format_title(file_path: &Option<PathBuf>) -> String {
     )
 }
 
-fn load_wgs(path: PathBuf) -> io::Result<WgsData> {
-    let buffer = read(path.clone())?;
+fn load_wgs<P>(path: P) -> io::Result<WgsData>
+where
+    P: AsRef<Path>,
+{
+    let buffer = read(&path)?;
     let mut reader = Cursor::new(&buffer);
 
-    log::info!("Opened wgs file: {:?}", path);
+    log::info!("Opened wgs file: {:?}", path.as_ref());
 
     Ok(WgsData::load(&mut reader).unwrap())
 }
 
 fn on_image_captured(width: u32, height: u32, buffer: Vec<u8>, filename: &str) {
     if let Some(path) = create_file(filename) {
-        match image::save_buffer(path.clone(), &buffer, width, height, ColorType::Rgba8) {
+        match image::save_buffer(&path, &buffer, width, height, ColorType::Rgba8) {
             Ok(()) => log::info!("Saving image file: {:?}", path),
             Err(err) => log::error!("Failed to save image: {}", err),
         }
     }
 }
 
-fn open_image(path: PathBuf) -> ImageResult<(u32, u32, Vec<u8>)> {
+fn open_image<P>(path: P) -> ImageResult<(u32, u32, Vec<u8>)>
+where
+    P: AsRef<Path>,
+{
     let image = image::open(path)?;
 
     let image = image.into_rgba8();
@@ -532,11 +530,14 @@ fn open_image(path: PathBuf) -> ImageResult<(u32, u32, Vec<u8>)> {
     Ok((width, height, data))
 }
 
-fn save_wgs(path: &PathBuf, wgs: &WgsData) {
+fn save_wgs<P>(path: P, wgs: &WgsData)
+where
+    P: AsRef<Path>,
+{
     let mut writer = Cursor::new(vec![]);
     wgs.save(&mut writer).unwrap();
 
     write_file(&path, writer.into_inner());
 
-    log::info!("Saving wgs file: {:?}", path);
+    log::info!("Saving wgs file: {:?}", path.as_ref());
 }
