@@ -18,6 +18,7 @@ pub enum UserEvent {
     OpenTexture,
     Pause,
     Quit,
+    RemoveTexture(usize),
     RequestRedraw,
     Restart,
     Resume,

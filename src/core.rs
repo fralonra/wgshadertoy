@@ -157,9 +157,6 @@ impl Core {
                         }
                         Err(err) => log::error!("Failed to open texture: {}", err),
                     }
-                } else {
-                    self.runtime.remove_texture(index);
-                    self.ui.remove_texture(index);
                 }
             }
             UserEvent::NewFile => {
@@ -225,6 +222,10 @@ impl Core {
             }
             UserEvent::Quit => {
                 response.request_quit = true;
+            }
+            UserEvent::RemoveTexture(index) => {
+                self.runtime.remove_texture(index);
+                self.ui.remove_texture(index);
             }
             UserEvent::RequestRedraw => {
                 self.runtime.set_wgs_frag(&self.ui_edit_context.frag);

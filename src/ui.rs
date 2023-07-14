@@ -293,13 +293,40 @@ impl Ui {
             ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
                 ui.with_layout(Layout::left_to_right(Align::Max), |ui| {
                     for (index, texture) in self.textures.iter().enumerate() {
-                        if image_upload(ui, image_size, Some(texture))
-                            .on_hover_text("Change/Remove (abort selection) the texture")
-                            .clicked()
-                        {
-                            event_proxy.send_event(UserEvent::ChangeTexture(index));
+                        let resp = image_upload(ui, image_size, Some(texture));
+
+                        if ui.rect_contains_pointer(resp.rect) {
+                            ui.put(resp.rect, |ui: &mut egui::Ui| {
+                                let painter = ui.painter();
+
+                                painter.rect_filled(
+                                    resp.rect,
+                                    0.0,
+                                    Color32::from_rgba_premultiplied(20, 20, 20, 180),
+                                );
+
+                                ui.horizontal(|ui| {
+                                    if ui
+                                        .button(icon_to_char(Icon::Edit).to_string())
+                                        .on_hover_text("Change texture")
+                                        .clicked()
+                                    {
+                                        event_proxy.send_event(UserEvent::ChangeTexture(index));
+                                    }
+
+                                    if ui
+                                        .button(icon_to_char(Icon::Delete).to_string())
+                                        .on_hover_text("Remove texture")
+                                        .clicked()
+                                    {
+                                        event_proxy.send_event(UserEvent::RemoveTexture(index));
+                                    }
+                                })
+                                .response
+                            });
                         }
                     }
+
                     if state.texture_addable {
                         if image_upload(ui, image_size, None)
                             .on_hover_text("Add texture")
