@@ -5,11 +5,11 @@ use crate::{
     fs::{create_file, select_file, select_texture, write_file},
     ui::{EditContext, Ui, UiState},
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use egui::ClippedPrimitive;
 use egui_wgpu::{renderer::ScreenDescriptor, Renderer};
 use egui_winit::State;
-use image::{ColorType, ImageResult};
+use image::ColorType;
 use std::{
     fs::read,
     io::{self, Cursor},
@@ -152,7 +152,12 @@ impl Core {
                             self.ui.change_texture(index, width, height, &data);
                             self.runtime.change_texture(index, width, height, data);
                         }
-                        Err(err) => log::error!("Failed to open texture: {}", err),
+                        Err(err) => {
+                            let err = format!("Failed to open texture: {}", err);
+
+                            log::error!("{}", err);
+                            self.change_status(AppStatus::Error(err));
+                        }
                     }
                 }
             }
@@ -191,7 +196,10 @@ impl Core {
                             response.set_title = Some(format_title(&self.wgs_path));
                         }
                         Err(err) => {
-                            log::error!("Failed to open file: {}", err);
+                            let err = format!("Failed to open file: {}", err);
+
+                            log::error!("{}", err);
+                            self.change_status(AppStatus::Error(err));
                         }
                     }
                 }
@@ -204,7 +212,10 @@ impl Core {
                             self.runtime.add_texture(width, height, data);
                         }
                         Err(err) => {
-                            log::error!("Failed to open texture: {}", err);
+                            let err = format!("Failed to open texture: {}", err);
+
+                            log::error!("{}", err);
+                            self.change_status(AppStatus::Error(err));
                         }
                     }
                 }
@@ -515,7 +526,7 @@ fn on_image_captured(width: u32, height: u32, buffer: Vec<u8>, filename: &str) {
     }
 }
 
-fn open_image<P>(path: P) -> ImageResult<(u32, u32, Vec<u8>)>
+fn open_image<P>(path: P) -> Result<(u32, u32, Vec<u8>)>
 where
     P: AsRef<Path>,
 {
@@ -524,7 +535,15 @@ where
     let image = image.into_rgba8();
 
     let width = image.width();
+    if width > 2048 {
+        bail!("Width larger than 2048");
+    }
+
     let height = image.height();
+    if height > 2048 {
+        bail!("Height larger than 2048");
+    }
+
     let data = image.into_vec();
 
     Ok((width, height, data))
