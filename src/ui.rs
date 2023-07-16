@@ -1,5 +1,6 @@
 mod highlight;
 mod image_upload;
+mod utils;
 
 use crate::{
     event::{AppStatus, EventProxy, UserEvent},
@@ -11,7 +12,7 @@ use egui::{
     TextEdit, TextureHandle, TextureOptions, TopBottomPanel,
 };
 use highlight::{CodeTheme, Highlighter};
-use image_upload::image_upload;
+use image_upload::ImageUpload;
 use material_icons::{icon_to_char, Icon};
 
 pub struct EditContext {
@@ -289,56 +290,33 @@ impl Ui {
                 ui.text_edit_singleline(&mut edit_context.name);
             });
 
-            let image_size = 50.0;
-            ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
-                ui.with_layout(Layout::left_to_right(Align::Max), |ui| {
+            ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
+                ui.with_layout(Layout::left_to_right(Align::BOTTOM), |ui| {
                     for (index, texture) in self.textures.iter().enumerate() {
-                        let resp = image_upload(ui, image_size, Some(texture));
-
-                        if ui.rect_contains_pointer(resp.rect) {
-                            ui.put(resp.rect, |ui: &mut egui::Ui| {
-                                let painter = ui.painter();
-
-                                painter.rect_filled(
-                                    resp.rect,
-                                    0.0,
-                                    Color32::from_rgba_premultiplied(20, 20, 20, 180),
-                                );
-
-                                ui.horizontal(|ui| {
-                                    if ui
-                                        .button(icon_to_char(Icon::Edit).to_string())
-                                        .on_hover_text("Change texture")
-                                        .clicked()
-                                    {
-                                        event_proxy.send_event(UserEvent::ChangeTexture(index));
-                                    }
-
-                                    if ui
-                                        .button(icon_to_char(Icon::Delete).to_string())
-                                        .on_hover_text("Remove texture")
-                                        .clicked()
-                                    {
-                                        event_proxy.send_event(UserEvent::RemoveTexture(index));
-                                    }
+                        ui.add(
+                            ImageUpload::new(Some(texture.id()))
+                                .edit_hint("Change texture")
+                                .remove_hint("Remove texture")
+                                .on_edit(|| {
+                                    event_proxy.send_event(UserEvent::ChangeTexture(index));
                                 })
-                                .response
-                            });
-                        }
+                                .on_remove(|| {
+                                    event_proxy.send_event(UserEvent::RemoveTexture(index));
+                                }),
+                        );
                     }
 
                     if state.texture_addable {
-                        if image_upload(ui, image_size, None)
-                            .on_hover_text("Add texture")
-                            .clicked()
-                        {
+                        let resp = ui.add(ImageUpload::new(None)).on_hover_text("Add texture");
+
+                        if resp.clicked() {
                             event_proxy.send_event(UserEvent::OpenTexture);
                         }
                     }
                 });
 
                 ScrollArea::vertical().show(ui, |ui| {
-                    ui.with_layout(Layout::top_down(Align::Min), |ui| {
+                    ui.with_layout(Layout::top_down(Align::LEFT), |ui| {
                         let editor = TextEdit::multiline(&mut edit_context.frag)
                             .code_editor()
                             .desired_width(ui.available_width() / 2.0 - 16.0);

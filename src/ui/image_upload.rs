@@ -1,39 +1,207 @@
-use egui::{vec2, Color32, CursorIcon, Image, Response, Sense, Stroke, TextureHandle, Ui, Vec2};
+use super::utils::layout_text_widget;
+use egui::{
+    pos2, vec2, Color32, CursorIcon, Rect, Response, Sense, Stroke, TextureId, Ui, Vec2, Widget,
+    WidgetText,
+};
+use material_icons::{icon_to_char, Icon};
 
-pub fn image_upload(ui: &mut Ui, size: f32, texture: Option<&TextureHandle>) -> Response {
-    let response = ui.allocate_response(Vec2::splat(size), Sense::click());
+pub struct ImageUpload<'a> {
+    size: f32,
+    rounding: f32,
 
-    let rect = response.rect;
+    texture_id: Option<TextureId>,
 
-    let stroke = Stroke::new(1.0, Color32::from_gray(128));
+    editable: bool,
+    removable: bool,
 
-    let painter = ui.painter_at(rect);
+    edit_hint: WidgetText,
+    remove_hint: WidgetText,
 
-    match texture {
-        Some(texture) => {
-            let image = Image::new(texture, rect.size());
-            image.paint_at(ui, rect);
-        }
-        None => {
-            let center = rect.center();
-            let half_len = size * 0.3;
+    on_edit: Option<Box<dyn 'a + FnOnce()>>,
+    on_remove: Option<Box<dyn 'a + FnOnce()>>,
+}
 
-            painter.line_segment(
-                [center - vec2(0.0, half_len), center + vec2(0.0, half_len)],
-                stroke,
-            );
-            painter.line_segment(
-                [center - vec2(half_len, 0.0), center + vec2(half_len, 0.0)],
-                stroke,
-            );
+impl<'a> Widget for ImageUpload<'a> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let response = ui.allocate_response(Vec2::splat(self.size), Sense::click());
 
-            if response.hovered() {
-                ui.output_mut(|o| o.cursor_icon = CursorIcon::PointingHand);
+        let rect = response.rect;
+
+        let stroke = Stroke::new(1.0, Color32::from_gray(128));
+
+        match self.texture_id {
+            Some(texture_id) => {
+                ui.painter().image(
+                    texture_id,
+                    rect,
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+
+                if self.editable || self.removable {
+                    if ui.rect_contains_pointer(rect) {
+                        ui.put(rect, |ui: &mut Ui| {
+                            ui.painter().rect_filled(
+                                rect,
+                                self.rounding,
+                                Color32::from_rgba_premultiplied(20, 20, 20, 180),
+                            );
+
+                            let mut content_size = Vec2::default();
+                            let button_padding = ui.spacing().button_padding;
+
+                            if self.editable {
+                                let (_text, size) = layout_text_widget(
+                                    ui,
+                                    icon_to_char(Icon::Edit).to_string(),
+                                    button_padding,
+                                );
+
+                                content_size += size;
+                            }
+
+                            if self.removable {
+                                let (_text, size) = layout_text_widget(
+                                    ui,
+                                    icon_to_char(Icon::Delete).to_string(),
+                                    button_padding,
+                                );
+
+                                content_size += size;
+                            }
+
+                            let button_count = if self.editable && self.removable {
+                                2.0
+                            } else {
+                                1.0
+                            };
+
+                            let item_spacing = ui.spacing().item_spacing;
+                            let content_size = vec2(
+                                content_size[0] + (button_count - 1.0) * item_spacing.x,
+                                content_size[1],
+                            );
+
+                            let content_rect = Rect::from_center_size(rect.center(), content_size);
+
+                            ui.allocate_ui_at_rect(content_rect, |ui| {
+                                ui.horizontal_centered(|ui| {
+                                    if self.editable {
+                                        let resp = ui.button(icon_to_char(Icon::Edit).to_string());
+
+                                        let resp = if !self.edit_hint.is_empty() {
+                                            resp.on_hover_text(self.edit_hint)
+                                        } else {
+                                            resp
+                                        };
+
+                                        if resp.clicked() {
+                                            if let Some(on_edit) = self.on_edit {
+                                                on_edit();
+                                            }
+                                        }
+                                    }
+
+                                    if self.removable {
+                                        let resp =
+                                            ui.button(icon_to_char(Icon::Delete).to_string());
+
+                                        let resp = if !self.remove_hint.is_empty() {
+                                            resp.on_hover_text(self.remove_hint)
+                                        } else {
+                                            resp
+                                        };
+
+                                        if resp.clicked() {
+                                            if let Some(on_remove) = self.on_remove {
+                                                on_remove();
+                                            }
+                                        }
+                                    }
+                                });
+                            })
+                            .response
+                        });
+                    }
+                }
             }
+            None => {
+                let center = rect.center();
+                let half_len = self.size * 0.3;
+
+                ui.painter().line_segment(
+                    [center - vec2(0.0, half_len), center + vec2(0.0, half_len)],
+                    stroke,
+                );
+                ui.painter().line_segment(
+                    [center - vec2(half_len, 0.0), center + vec2(half_len, 0.0)],
+                    stroke,
+                );
+
+                if response.hovered() {
+                    ui.output_mut(|o| o.cursor_icon = CursorIcon::PointingHand);
+                }
+            }
+        }
+
+        ui.painter().rect_stroke(rect, self.rounding, stroke);
+
+        response
+    }
+}
+
+impl<'a> ImageUpload<'a> {
+    pub fn new(texture_id: Option<TextureId>) -> Self {
+        Self {
+            size: 50.0,
+            rounding: 5.0,
+            texture_id,
+            editable: true,
+            removable: true,
+            edit_hint: WidgetText::default(),
+            remove_hint: WidgetText::default(),
+            on_edit: None,
+            on_remove: None,
         }
     }
 
-    painter.rect_stroke(rect, 5.0, stroke);
+    pub fn editable(mut self, editable: bool) -> Self {
+        self.editable = editable;
+        self
+    }
 
-    response
+    pub fn edit_hint(mut self, edit_hint: impl Into<WidgetText>) -> Self {
+        self.edit_hint = edit_hint.into();
+        self
+    }
+
+    pub fn on_edit(mut self, on_edit: impl 'a + FnOnce()) -> Self {
+        self.on_edit = Some(Box::new(on_edit));
+        self
+    }
+
+    pub fn on_remove(mut self, on_remove: impl 'a + FnOnce()) -> Self {
+        self.on_remove = Some(Box::new(on_remove));
+        self
+    }
+
+    pub fn removable(mut self, removable: bool) -> Self {
+        self.removable = removable;
+        self
+    }
+
+    pub fn remove_hint(mut self, remove_hint: impl Into<WidgetText>) -> Self {
+        self.remove_hint = remove_hint.into();
+        self
+    }
+
+    pub fn rounding(mut self, rounding: f32) -> Self {
+        self.rounding = rounding;
+        self
+    }
+
+    pub fn size(mut self, size: f32) -> Self {
+        self.size = size;
+        self
+    }
 }
