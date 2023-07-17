@@ -3,7 +3,7 @@ use crate::{
     window_icon::window_icon,
 };
 use anyhow::Result;
-use egui::{CentralPanel, Pos2, Rect, Vec2};
+use egui::{pos2, vec2, CentralPanel, Rect};
 use raw_window_handle::RawWindowHandle;
 use std::env;
 use winit::{
@@ -57,13 +57,13 @@ impl WindowExt<UserEvent> for AboutWindow {
             CentralPanel::default().show(ctx, |ui| {
                 let widget_size = ui.available_size();
                 let content_size =
-                    widget_size.min(Vec2::new(RECOMMAND_WIDTH as f32, RECOMMAND_HEIGHT as f32));
+                    widget_size.min(vec2(RECOMMAND_WIDTH as f32, RECOMMAND_HEIGHT as f32));
 
                 let padding = 20.0;
 
                 let rect = Rect::from_center_size(
-                    Pos2::new(widget_size.x / 2.0, widget_size.y / 2.0),
-                    Vec2::new(
+                    pos2(widget_size.x / 2.0, widget_size.y / 2.0),
+                    vec2(
                         content_size.x - padding * 2.0,
                         content_size.y - padding * 2.0,
                     ),

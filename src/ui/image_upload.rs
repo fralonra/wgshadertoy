@@ -38,6 +38,12 @@ impl<'a> Widget for ImageUpload<'a> {
                     Color32::WHITE,
                 );
 
+                ui.painter_at(rect).rect_stroke(
+                    rect,
+                    self.rounding,
+                    Stroke::new(self.rounding.min(self.size * 0.5), ui.visuals().window_fill),
+                );
+
                 if self.editable || self.removable {
                     if ui.rect_contains_pointer(rect) {
                         ui.put(rect, |ui: &mut Ui| {

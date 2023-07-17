@@ -1,4 +1,4 @@
-use egui::{vec2, widget_text::WidgetTextGalley, NumExt, TextStyle, Ui, Vec2, WidgetText};
+use egui::{vec2, widget_text::WidgetTextGalley, TextStyle, Ui, Vec2, WidgetText};
 
 pub fn layout_text_widget(
     ui: &mut Ui,
@@ -17,7 +17,7 @@ pub fn layout_text_widget(
 
     let widget_size = vec2(
         text.size().x + total_padding.x,
-        (text.size().y + total_padding.y).at_least(ui.spacing().interact_size.y),
+        (text.size().y + total_padding.y).max(ui.spacing().interact_size.y),
     );
 
     (text, widget_size)
