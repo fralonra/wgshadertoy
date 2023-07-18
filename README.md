@@ -6,7 +6,7 @@
 
 A [WGSL](https://www.w3.org/TR/WGSL/) playground inspired by [Shadertoy](https://www.shadertoy.com/).
 
-<img src="./doc/basic.png" alt="preview">
+<img src="https://raw.githubusercontent.com/fralonra/wgshadertoy/master/doc/basic.png" alt="preview">
 
 ## Installation
 
