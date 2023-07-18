@@ -38,7 +38,7 @@ The application use a binary format [`wgs`](https://github.com/fralonra/wgs) to 
 
 It helps to share your shaders amoung people.
 
-You can find examples in [wgs's repo](https://github.com/fralonra/wgs/tree/master/exampless).
+You can find examples in [wgs's repo](https://github.com/fralonra/wgs/tree/master/examples).
 
 ## Limits
 
