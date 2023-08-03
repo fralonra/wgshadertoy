@@ -5,7 +5,7 @@
         <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of [ProductName] is already installed."/>
         <Icon Id="WgShadertoy.exe" SourceFile=".\extra\windows\wgshadertoy.ico"/>
         <WixVariable Id="WixUILicenseRtf" Value=".\extra\windows\wix\license.rtf"/>
-        <Property Id="ARPPRODUCTICON" Value="wgshadertoy.exe"/>
+        <Property Id="ARPPRODUCTICON" Value="WgShadertoy.exe"/>
         <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
         <MediaTemplate EmbedCab="yes"/>
         <UIRef Id="WixUI_InstallDir"/>
