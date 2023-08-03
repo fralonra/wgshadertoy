@@ -242,13 +242,6 @@ impl Ui {
                 {
                     event_proxy.send_event(UserEvent::RequestRedraw);
                 }
-                if ui
-                    .button(icon_to_char(Icon::ScreenshotMonitor).to_string())
-                    .on_hover_text("Capture image")
-                    .clicked()
-                {
-                    event_proxy.send_event(UserEvent::CaptureImage);
-                }
 
                 ui.separator();
 

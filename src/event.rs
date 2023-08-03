@@ -10,7 +10,6 @@ pub enum AppStatus {
 
 #[derive(Debug)]
 pub enum UserEvent {
-    CaptureImage,
     ChangeTexture(usize),
     NewFile,
     OpenAbout,
