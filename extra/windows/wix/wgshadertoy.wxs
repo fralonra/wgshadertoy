@@ -24,7 +24,7 @@
                      Control="Finish" 
                      Event="DoAction" 
                      Value="LaunchApplication">WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 and NOT Installed</Publish>
-        </Ui>
+        </UI>
 
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFilesFolder">
