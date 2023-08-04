@@ -47,7 +47,7 @@
                           Icon="WgShadertoyIcon"
                           Name="WgShadertoy"
                           Description="A WGSL playground inspired by Shadertoy"
-                          Target="[#WgShadertoyExeFile]"
+                          Target="[INSTALLDIR][#WgShadertoyExeFile]"
                           WorkingDirectory="INSTALLDIR"/>
                 <Shortcut Id="UninstallProduct"
                           Name="Uninstall WgShadertoy"
