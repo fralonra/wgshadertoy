@@ -65,9 +65,9 @@ jobs:
           ./WiX.*/tools/candle.exe -arch "x64" -ext WixUIExtension -ext WixUtilExtension \
             -out "./wgshadertoy.wixobj" "extra/windows/wix/wgshadertoy.wxs"
           ./WiX.*/tools/light.exe -ext WixUIExtension -ext WixUtilExtension \
-            -out "./wgshadertoy-windows.msi" -sice:ICE61 -sice:ICE91 \
+            -out "./WgShadertoy.msi" -sice:ICE61 -sice:ICE91 \
             "./wgshadertoy.wixobj"
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ./wgshadertoy-windows.msi
+          files: ./WgShadertoy.msi
