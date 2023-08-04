@@ -60,7 +60,7 @@
         </DirectoryRef>
 
         <DirectoryRef Id="INSTALLDIR">
-            <Component Id="ModifyPathEnv" Guid="*">
+            <Component Id="ModifyPathEnv" Guid="856af15d-9368-47c9-a6af-8aec2d549619" KeyPath="yes">
                 <Environment Id="PathEnv" Value="[INSTALLDIR]" Name="PATH" Permanent="no" Part="first" Action="set" System="yes"/>
             </Component>
         </DirectoryRef>
