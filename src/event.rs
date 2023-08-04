@@ -1,3 +1,4 @@
+use crate::example::Example;
 use winit::event_loop::EventLoopProxy;
 
 #[derive(Clone, Debug)]
@@ -13,6 +14,7 @@ pub enum UserEvent {
     ChangeTexture(usize),
     NewFile,
     OpenAbout,
+    OpenExample(Example),
     OpenFile,
     OpenTexture,
     Pause,

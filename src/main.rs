@@ -5,6 +5,7 @@ mod app;
 mod core;
 mod egui_winit_wgpu_context;
 mod event;
+mod example;
 #[cfg(feature = "fps")]
 mod fps_counter;
 mod fs;

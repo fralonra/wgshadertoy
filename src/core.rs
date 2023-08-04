@@ -2,6 +2,7 @@
 use crate::fps_counter::FpsCounter;
 use crate::{
     event::{AppResponse, AppStatus, EventProxyWinit, UserEvent},
+    example::Example,
     fs::{create_file, select_file, select_texture, write_file},
     ui::{EditContext, Ui, UiState},
 };
@@ -145,20 +146,34 @@ impl Core {
             UserEvent::OpenAbout => {
                 response.request_open_about = true;
             }
+            UserEvent::OpenExample(example) => {
+                let bytes = Example::data(example);
+
+                match load_wgs_from_buffer(&bytes) {
+                    Ok(wgs) => {
+                        self.wgs_path = None;
+
+                        self.load_wgs(&wgs);
+
+                        update_result = Some(self.runtime.load(wgs));
+
+                        response.set_title = Some(format_title(&self.wgs_path));
+                    }
+                    Err(err) => {
+                        let err = format!("Failed to open example: {}", err);
+
+                        log::error!("{}", err);
+                        self.change_status(AppStatus::Error(err));
+                    }
+                }
+            }
             UserEvent::OpenFile => {
                 if let Some(path) = select_file() {
-                    match load_wgs(&path) {
+                    match load_wgs_from_file(&path) {
                         Ok(wgs) => {
                             self.wgs_path = Some(path);
 
-                            self.ui.reset_textures();
-                            for texture in wgs.textures_ref() {
-                                self.ui
-                                    .add_texture(texture.width, texture.height, &texture.data);
-                            }
-
-                            self.ui_edit_context.frag = wgs.frag();
-                            self.ui_edit_context.name = wgs.name();
+                            self.load_wgs(&wgs);
 
                             update_result = Some(self.runtime.load(wgs));
 
@@ -294,6 +309,18 @@ impl Core {
         self.status = status;
 
         self.status_clock = Instant::now();
+    }
+
+    fn load_wgs(&mut self, wgs: &WgsData) {
+        self.ui.reset_textures();
+
+        for texture in wgs.textures_ref() {
+            self.ui
+                .add_texture(texture.width, texture.height, &texture.data);
+        }
+
+        self.ui_edit_context.frag = wgs.frag();
+        self.ui_edit_context.name = wgs.name();
     }
 
     fn render(&mut self, window: &Window) -> Result<()> {
@@ -474,16 +501,19 @@ pub fn format_title(file_path: &Option<PathBuf>) -> String {
     )
 }
 
-fn load_wgs<P>(path: P) -> io::Result<WgsData>
+fn load_wgs_from_buffer(buffer: &[u8]) -> io::Result<WgsData> {
+    let mut reader = Cursor::new(&buffer);
+
+    Ok(WgsData::load(&mut reader).unwrap())
+}
+
+fn load_wgs_from_file<P>(path: P) -> io::Result<WgsData>
 where
     P: AsRef<Path>,
 {
     let buffer = read(&path)?;
-    let mut reader = Cursor::new(&buffer);
 
-    log::info!("Opened wgs file: {:?}", path.as_ref());
-
-    Ok(WgsData::load(&mut reader).unwrap())
+    load_wgs_from_buffer(&buffer)
 }
 
 fn open_image<P>(path: P) -> Result<(u32, u32, Vec<u8>)>
