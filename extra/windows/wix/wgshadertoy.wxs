@@ -49,11 +49,6 @@
                           Description="A WGSL playground inspired by Shadertoy"
                           Target="[!WgShadertoyExeFile]"
                           WorkingDirectory="INSTALLDIR"/>
-                <Shortcut Id="UninstallProduct"
-                          Name="Uninstall WgShadertoy"
-                          Target="[SystemFolder]msiexec.exe"
-                          Arguments="/x [ProductCode]"
-                          Description="Uninstalls WgShadertoy" />
                 <RemoveFolder Id="ProgramMenu" Directory="ProgramMenu" On="uninstall"/>
                 <RegistryValue Root="HKCU" Key="Software\Fralonra\WgShadertoy" Name="installed" Type="integer" Value="1" KeyPath="yes"/>
             </Component>
