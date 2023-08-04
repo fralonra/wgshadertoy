@@ -27,7 +27,7 @@
         </UI>
 
         <Directory Id="TARGETDIR" Name="SourceDir">
-            <Directory Id="ProgramFilesFolder">
+            <Directory Id="ProgramFiles64Folder">
                 <Directory Id="INSTALLDIR" Name="WgShadertoy"/>
             </Directory>
             <Directory Id="ProgramMenuFolder">
@@ -47,7 +47,7 @@
                           Icon="WgShadertoyIcon"
                           Name="WgShadertoy"
                           Description="A WGSL playground inspired by Shadertoy"
-                          Target="[INSTALLDIR][#WgShadertoyExeFile]"
+                          Target="[!WgShadertoyExeFile]"
                           WorkingDirectory="INSTALLDIR"/>
                 <Shortcut Id="UninstallProduct"
                           Name="Uninstall WgShadertoy"
