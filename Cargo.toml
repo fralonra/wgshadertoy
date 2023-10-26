@@ -9,9 +9,9 @@ fps = []
 
 [dependencies]
 anyhow = "1.0"
-egui = "0.22"
-egui-winit = "0.22"
-egui-wgpu = { version = "0.22", features = ["winit"] }
+egui = "0.23"
+egui-winit = "0.23"
+egui-wgpu = { version = "0.23", features = ["winit"] }
 env_logger = "0.9"
 futures = "0.3"
 image = "0.24"
@@ -19,7 +19,6 @@ log = "0.4"
 material-icons = { git = "https://github.com/fschutt/material-icons.git" }
 raw-window-handle = "0.5"
 rfd = "0.10"
-wgpu = "0.16"
 wgs_core = "0.1"
 wgs_runtime_wgpu = "0.1"
 winit = "0.28"

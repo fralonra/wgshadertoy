@@ -9,12 +9,13 @@ use crate::{
 };
 use egui::{
     menu, style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
-    FontData, FontDefinitions, FontFamily, FullOutput, ImageData, Layout, RawInput, ScrollArea,
-    TextEdit, TextureHandle, TextureOptions, TopBottomPanel,
+    FontData, FontDefinitions, FontFamily, FullOutput, Layout, RawInput, ScrollArea, TextEdit,
+    TextureHandle, TextureOptions, TopBottomPanel,
 };
 use highlight::{CodeTheme, Highlighter};
 use image_upload::ImageUpload;
 use material_icons::{icon_to_char, Icon};
+use std::sync::Arc;
 
 pub struct EditContext {
     pub frag: String,
@@ -45,7 +46,7 @@ impl Ui {
     pub fn add_texture(&mut self, width: u32, height: u32, data: &[u8]) {
         self.textures.push(self.context.load_texture(
             "debug",
-            ImageData::Color(ColorImage::from_rgba_unmultiplied(
+            Arc::new(ColorImage::from_rgba_unmultiplied(
                 [width as usize, height as usize],
                 &data,
             )),
@@ -56,7 +57,7 @@ impl Ui {
     pub fn change_texture(&mut self, index: usize, width: u32, height: u32, data: &[u8]) {
         self.textures[index] = self.context.load_texture(
             "debug",
-            ImageData::Color(ColorImage::from_rgba_unmultiplied(
+            Arc::new(ColorImage::from_rgba_unmultiplied(
                 [width as usize, height as usize],
                 &data,
             )),
@@ -275,6 +276,15 @@ impl Ui {
                 {
                     event_proxy.send_event(UserEvent::RequestRedraw);
                 }
+                if state.can_capture {
+                    if ui
+                        .button(icon_to_char(Icon::ScreenshotMonitor).to_string())
+                        .on_hover_text("Capture image")
+                        .clicked()
+                    {
+                        event_proxy.send_event(UserEvent::CaptureImage);
+                    }
+                }
 
                 ui.separator();
 
@@ -362,6 +372,7 @@ impl Ui {
 }
 
 pub struct UiState {
+    pub can_capture: bool,
     pub file_saved: bool,
     pub is_paused: bool,
     pub status: AppStatus,

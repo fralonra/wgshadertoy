@@ -10,6 +10,7 @@ use anyhow::{bail, Result};
 use egui::ClippedPrimitive;
 use egui_wgpu::{renderer::ScreenDescriptor, Renderer};
 use egui_winit::State;
+use image::ColorType;
 use std::{
     fs::read,
     io::{self, Cursor},
@@ -17,7 +18,7 @@ use std::{
     time::Instant,
 };
 use wgs_core::WgsData;
-use wgs_runtime_wgpu::{Runtime, RuntimeExt, Viewport};
+use wgs_runtime_wgpu::{wgpu, Runtime, RuntimeExt, Viewport};
 use winit::{event::WindowEvent, event_loop::EventLoop, window::Window};
 
 pub struct Core {
@@ -115,6 +116,36 @@ impl Core {
         let mut update_result = None;
 
         match event {
+            UserEvent::CaptureImage => {
+                let half_width = self.size.0 / 2.0;
+
+                let viewport = Viewport {
+                    x: half_width,
+                    width: half_width,
+                    height: self.size.1,
+                    ..Default::default()
+                };
+
+                let filename = format!(
+                    "Capture_{}.{}",
+                    self.runtime
+                        .wgs()
+                        .name()
+                        .to_ascii_lowercase()
+                        .replace(" ", "_"),
+                    "png"
+                );
+                self.runtime.request_capture_image(
+                    &viewport,
+                    move |runtime, width, height, buffer| {
+                        runtime.pause();
+
+                        on_image_captured(width, height, buffer, &filename);
+
+                        runtime.resume();
+                    },
+                );
+            }
             UserEvent::ChangeTexture(index) => {
                 if let Some(path) = select_texture() {
                     match open_image(path) {
@@ -342,6 +373,7 @@ impl Core {
 
         {
             let ui_state = UiState {
+                can_capture: self.runtime.is_capture_supported(),
                 file_saved: self.wgs_path.is_some(),
                 is_paused: self.runtime.is_paused(),
                 status: self.status.clone(),
@@ -514,6 +546,15 @@ where
     let buffer = read(&path)?;
 
     load_wgs_from_buffer(&buffer)
+}
+
+fn on_image_captured(width: u32, height: u32, buffer: Vec<u8>, filename: &str) {
+    if let Some(path) = create_file(filename) {
+        match image::save_buffer(&path, &buffer, width, height, ColorType::Rgba8) {
+            Ok(()) => log::info!("Saving image file: {:?}", path),
+            Err(err) => log::error!("Failed to save image: {}", err),
+        }
+    }
 }
 
 fn open_image<P>(path: P) -> Result<(u32, u32, Vec<u8>)>
