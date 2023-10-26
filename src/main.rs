@@ -17,7 +17,10 @@ mod window_icon;
 fn main() {
     env_logger::init();
 
-    let app = app::App::new().unwrap();
-
-    app.run();
+    match app::App::new() {
+        Ok(app) => app.run(),
+        Err(err) => {
+            log::error!("Failed to initialize WgShadertoy: {}", err);
+        }
+    }
 }
