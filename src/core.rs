@@ -2,7 +2,6 @@
 use crate::fps_counter::FpsCounter;
 use crate::{
     event::{AppResponse, AppStatus, EventProxyWinit, UserEvent},
-    example::Example,
     fs::{create_file, select_file, select_texture, write_file},
     ui::{EditContext, Ui, UiState},
 };
@@ -178,7 +177,7 @@ impl Core {
                 response.request_open_about = true;
             }
             UserEvent::OpenExample(example) => {
-                let bytes = Example::data(example);
+                let bytes = example.data();
 
                 match load_wgs_from_buffer(&bytes) {
                     Ok(wgs) => {

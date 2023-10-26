@@ -155,31 +155,25 @@ impl Ui {
                     }
 
                     ui.menu_button("Open Examples", |ui| {
-                        if ui.button(Example::description(Example::Default)).clicked() {
+                        if ui.button(Example::Default.description()).clicked() {
                             event_proxy.send_event(UserEvent::OpenExample(Example::Default));
 
                             ui.close_menu();
                         }
 
-                        if ui
-                            .button(Example::description(Example::MouseInput))
-                            .clicked()
-                        {
+                        if ui.button(Example::MouseInput.description()).clicked() {
                             event_proxy.send_event(UserEvent::OpenExample(Example::MouseInput));
 
                             ui.close_menu();
                         }
 
-                        if ui.button(Example::description(Example::Texture)).clicked() {
+                        if ui.button(Example::Texture.description()).clicked() {
                             event_proxy.send_event(UserEvent::OpenExample(Example::Texture));
 
                             ui.close_menu();
                         }
 
-                        if ui
-                            .button(Example::description(Example::TwoTexture))
-                            .clicked()
-                        {
+                        if ui.button(Example::TwoTexture.description()).clicked() {
                             event_proxy.send_event(UserEvent::OpenExample(Example::TwoTexture));
 
                             ui.close_menu();
