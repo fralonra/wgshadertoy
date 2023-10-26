@@ -4,6 +4,10 @@
 
 <h1 align="center">WgShadertoy</h1>
 
+![Flathub](https://img.shields.io/flathub/downloads/io.github.fralonra.WgShadertoy?label=flathub)
+![AUR](https://img.shields.io/aur/version/wgshadertoy)
+![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
+
 A [WGSL](https://www.w3.org/TR/WGSL/) playground inspired by [Shadertoy](https://www.shadertoy.com/).
 
 <img src="https://raw.githubusercontent.com/fralonra/wgshadertoy/master/doc/basic.png" alt="preview">
