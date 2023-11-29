@@ -10,9 +10,10 @@ fps = []
 [dependencies]
 anyhow = "1.0"
 egui = "0.23"
-egui-winit = "0.23"
 egui-wgpu = { version = "0.23", features = ["winit"] }
+egui-winit = "0.23"
 env_logger = "0.9"
+font-kit = "0.11"
 futures = "0.3"
 image = "0.24"
 log = "0.4"

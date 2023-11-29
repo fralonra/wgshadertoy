@@ -5,12 +5,14 @@ mod utils;
 use crate::{
     event::{AppStatus, EventProxy, UserEvent},
     example::Example,
+    fonts::{load_font, load_system_font},
     shortcut::Shortcut,
 };
+use anyhow::Result;
 use egui::{
     menu, style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
-    FontData, FontDefinitions, FontFamily, FullOutput, Layout, RawInput, ScrollArea, TextEdit,
-    TextureHandle, TextureOptions, TopBottomPanel,
+    FontData, FontDefinitions, FullOutput, Layout, RawInput, ScrollArea, TextEdit, TextureHandle,
+    TextureOptions, TopBottomPanel,
 };
 use highlight::{CodeTheme, Highlighter};
 use image_upload::ImageUpload;
@@ -376,20 +378,13 @@ pub struct UiState {
 fn setup_fonts(ctx: &mut Context) {
     let mut fonts = FontDefinitions::default();
 
-    const FONT_MATERIAL_ICON: &'static str = "MaterialIcons-Regular";
+    load_system_font(&mut fonts);
 
-    fonts.font_data.insert(
-        FONT_MATERIAL_ICON.to_owned(),
+    load_font(
+        &mut fonts,
+        "MaterialIcons-Regular",
         FontData::from_static(material_icons::FONT),
     );
-
-    if let Some(vec) = fonts.families.get_mut(&FontFamily::Proportional) {
-        vec.push(FONT_MATERIAL_ICON.to_owned());
-    }
-
-    if let Some(vec) = fonts.families.get_mut(&FontFamily::Monospace) {
-        vec.push(FONT_MATERIAL_ICON.to_owned());
-    }
 
     ctx.set_fonts(fonts);
 }
