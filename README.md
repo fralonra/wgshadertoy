@@ -14,13 +14,22 @@ A [WGSL](https://www.w3.org/TR/WGSL/) playground inspired by [Shadertoy](https:/
 
 ## Installation
 
-Check the [latest release](https://github.com/fralonra/wgshadertoy/releases) for your specific OS.
+### Windows
 
-Currently, `msi` for Windows, `dmg` for MacOS are provided. If you are willing to contribute more packages (such as `deb`, `rpm`...), feel free to open a PR.
+Check out the [latest release](https://github.com/fralonra/wgshadertoy/releases) for a `msi` installer.
+
+
+### MacOS
+
+Available on [MacPorts](https://ports.macports.org/port/wgshadertoy/):
+
+```
+sudo port install wgshadertoy
+```
 
 ### Linux
 
-`wgshadertoy` is available on [Flathub](https://flathub.org/apps/io.github.fralonra.WgShadertoy).
+Available on [Flathub](https://flathub.org/apps/io.github.fralonra.WgShadertoy).
 
 <a href="https://flathub.org/apps/io.github.fralonra.WgShadertoy">
   <img width="240" alt="Download on Flathub" src="https://dl.flathub.org/assets/badges/flathub-badge-en.png" align="start"/>
