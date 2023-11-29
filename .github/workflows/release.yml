@@ -26,26 +26,6 @@ jobs:
         with:
           files: ./wgshadertoy-linux.tar.gz
 
-  macos:
-    runs-on: macos-11
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install ARM target
-        run: rustup update && rustup target add aarch64-apple-darwin
-      - name: Build ARM
-        run: GIT_COMMIT_HASH=$(git rev-parse --short HEAD) cargo build --release --target=aarch64-apple-darwin
-      - name: Make DMG
-        run: |
-          make dmg-universal
-          mv ./target/release/osx/WgShadertoy.dmg ./WgShadertoy.dmg
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: ./WgShadertoy.dmg
-
   windows:
     runs-on: windows-latest
     defaults:
