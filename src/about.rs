@@ -1,9 +1,9 @@
 use crate::{
-    egui_winit_wgpu_context::EguiWinitWgpuContext, event::UserEvent, window::WindowExt,
-    window_icon::window_icon,
+    egui_winit_wgpu_context::EguiWinitWgpuContext, event::UserEvent, fonts::load_system_font,
+    window::WindowExt, window_icon::window_icon,
 };
 use anyhow::Result;
-use egui::{pos2, vec2, CentralPanel, Rect};
+use egui::{pos2, vec2, CentralPanel, Context, FontDefinitions, Rect};
 use raw_window_handle::RawWindowHandle;
 use std::env;
 use winit::{
@@ -35,7 +35,9 @@ impl WindowExt<UserEvent> for AboutWindow {
 
         let window = builder.build(event_loop)?;
 
-        let context = EguiWinitWgpuContext::new(&window, event_loop)?;
+        let mut context = EguiWinitWgpuContext::new(&window, event_loop)?;
+
+        setup_fonts(context.context_mut());
 
         Ok(Self { context, window })
     }
@@ -80,7 +82,7 @@ impl WindowExt<UserEvent> for AboutWindow {
 
                     ui.centered_and_justified(|ui| {
                         ui.horizontal(|ui| {
-                            ui.label("Homepage: ");
+                            ui.label(format!("{}: ", fl!("about_homepage")));
                             ui.hyperlink(env!("CARGO_PKG_HOMEPAGE"));
                         })
                     });
@@ -96,4 +98,12 @@ impl WindowExt<UserEvent> for AboutWindow {
     fn window_id(&self) -> WindowId {
         self.window.id()
     }
+}
+
+fn setup_fonts(ctx: &mut Context) {
+    let mut fonts = FontDefinitions::default();
+
+    load_system_font(&mut fonts);
+
+    ctx.set_fonts(fonts);
 }

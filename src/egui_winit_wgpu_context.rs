@@ -26,6 +26,10 @@ impl EguiWinitWgpuContext {
         })
     }
 
+    pub fn context_mut(&mut self) -> &mut Context {
+        &mut self.context
+    }
+
     pub fn handle_window_event(&mut self, event: &WindowEvent) -> bool {
         self.state.on_event(&self.context, event).repaint
     }
