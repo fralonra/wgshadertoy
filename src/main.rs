@@ -1,5 +1,8 @@
 #![windows_subsystem = "windows"]
 
+#[macro_use]
+mod macros;
+
 mod about;
 mod app;
 mod core;
@@ -10,6 +13,7 @@ mod fonts;
 #[cfg(feature = "fps")]
 mod fps_counter;
 mod fs;
+mod i18n;
 mod shortcut;
 mod ui;
 mod window;

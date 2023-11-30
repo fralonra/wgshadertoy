@@ -6,9 +6,9 @@ use crate::{
     event::{AppStatus, EventProxy, UserEvent},
     example::Example,
     fonts::{load_font, load_system_font},
+    i18n::{select_locales, select_system_locales, LANGUAGES},
     shortcut::Shortcut,
 };
-use anyhow::Result;
 use egui::{
     menu, style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
     FontData, FontDefinitions, FullOutput, Layout, RawInput, ScrollArea, TextEdit, TextureHandle,
@@ -131,10 +131,10 @@ impl Ui {
 
         TopBottomPanel::top("menu").show(ctx, |ui| {
             menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
+                ui.menu_button(fl!("menu_file"), |ui| {
                     if ui
                         .add(
-                            Button::new("New")
+                            Button::new(fl!("menu_new"))
                                 .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.file_new)),
                         )
                         .clicked()
@@ -146,7 +146,7 @@ impl Ui {
 
                     if ui
                         .add(
-                            Button::new("Open")
+                            Button::new(fl!("menu_open"))
                                 .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.file_open)),
                         )
                         .clicked()
@@ -156,7 +156,7 @@ impl Ui {
                         ui.close_menu();
                     }
 
-                    ui.menu_button("Open Examples", |ui| {
+                    ui.menu_button(fl!("menu_open_examples"), |ui| {
                         if ui.button(Example::Default.description()).clicked() {
                             event_proxy.send_event(UserEvent::OpenExample(Example::Default));
 
@@ -186,7 +186,7 @@ impl Ui {
 
                     if ui
                         .add(
-                            Button::new("Save")
+                            Button::new(fl!("menu_save"))
                                 .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.file_save)),
                         )
                         .clicked()
@@ -198,7 +198,7 @@ impl Ui {
 
                     if ui
                         .add(
-                            Button::new("Save As").shortcut_text(
+                            Button::new(fl!("menu_save_as")).shortcut_text(
                                 ui.ctx().format_shortcut(&self.shortcut.file_save_as),
                             ),
                         )
@@ -213,7 +213,7 @@ impl Ui {
 
                     if ui
                         .add(
-                            Button::new("Quit")
+                            Button::new(fl!("menu_quit"))
                                 .shortcut_text(ui.ctx().format_shortcut(&self.shortcut.app_quit)),
                         )
                         .clicked()
@@ -224,8 +224,33 @@ impl Ui {
                     }
                 });
 
-                ui.menu_button("Help", |ui| {
-                    if ui.button("About").clicked() {
+                ui.menu_button(fl!("menu_preferences"), |ui| {
+                    ui.menu_button(fl!("menu_languages"), |ui| {
+                        ui.set_width(250.0);
+
+                        if ui.button(fl!("menu_language_system")).clicked() {
+                            select_system_locales();
+
+                            ui.close_menu();
+                        }
+
+                        ui.separator();
+
+                        for language in LANGUAGES {
+                            if ui
+                                .button(format!("{} [{}]", language.label, language.id))
+                                .clicked()
+                            {
+                                select_locales(&[language.id]);
+
+                                ui.close_menu();
+                            }
+                        }
+                    });
+                });
+
+                ui.menu_button(fl!("menu_help"), |ui| {
+                    if ui.button(fl!("menu_about")).clicked() {
                         event_proxy.send_event(UserEvent::OpenAbout);
 
                         ui.close_menu();
@@ -267,7 +292,7 @@ impl Ui {
 
                 if ui
                     .button(icon_to_char(Icon::PlayArrow).to_string())
-                    .on_hover_text("Compile and run")
+                    .on_hover_text(fl!("control_compile_run"))
                     .clicked()
                 {
                     event_proxy.send_event(UserEvent::RequestRedraw);
@@ -275,7 +300,7 @@ impl Ui {
                 if state.can_capture {
                     if ui
                         .button(icon_to_char(Icon::ScreenshotMonitor).to_string())
-                        .on_hover_text("Capture image")
+                        .on_hover_text(fl!("control_capture"))
                         .clicked()
                     {
                         event_proxy.send_event(UserEvent::CaptureImage);
@@ -286,7 +311,7 @@ impl Ui {
 
                 if ui
                     .button(icon_to_char(Icon::PlayCircleFilled).to_string())
-                    .on_hover_text("Restart")
+                    .on_hover_text(fl!("control_restart"))
                     .clicked()
                 {
                     event_proxy.send_event(UserEvent::Restart);
@@ -300,7 +325,11 @@ impl Ui {
                         })
                         .to_string(),
                     )
-                    .on_hover_text(if state.is_paused { "Resume" } else { "Pause" })
+                    .on_hover_text(if state.is_paused {
+                        fl!("control_resume")
+                    } else {
+                        fl!("control_pause")
+                    })
                     .clicked()
                 {
                     event_proxy.send_event(if state.is_paused {
@@ -318,7 +347,7 @@ impl Ui {
             ui.horizontal_wrapped(|ui| {
                 ui.set_max_width(ui.available_width() / 2.0);
 
-                ui.label("Name: ");
+                ui.label(format!("{}: ", fl!("edit_name")));
                 ui.text_edit_singleline(&mut edit_context.name);
             });
 
@@ -327,8 +356,8 @@ impl Ui {
                     for (index, texture) in self.textures.iter().enumerate() {
                         ui.add(
                             ImageUpload::new(Some(texture.id()))
-                                .edit_hint("Change texture")
-                                .remove_hint("Remove texture")
+                                .edit_hint(fl!("edit_change_texture"))
+                                .remove_hint(fl!("edit_remove_texture"))
                                 .on_edit(|| {
                                     event_proxy.send_event(UserEvent::ChangeTexture(index));
                                 })
@@ -339,7 +368,9 @@ impl Ui {
                     }
 
                     if state.texture_addable {
-                        let resp = ui.add(ImageUpload::new(None)).on_hover_text("Add texture");
+                        let resp = ui
+                            .add(ImageUpload::new(None))
+                            .on_hover_text(fl!("edit_add_texture"));
 
                         if resp.clicked() {
                             event_proxy.send_event(UserEvent::OpenTexture);

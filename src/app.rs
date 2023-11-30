@@ -2,6 +2,7 @@ use crate::{
     about::AboutWindow,
     core::{format_title, Core},
     event::UserEvent,
+    i18n::select_system_locales,
     window::WindowExt,
     window_icon::window_icon,
 };
@@ -48,6 +49,8 @@ impl App {
             inner_size.height as f32,
             window.scale_factor() as f32,
         )?;
+
+        select_system_locales()?;
 
         Ok(Self {
             core,
