@@ -153,10 +153,13 @@ impl Core {
                             self.runtime.change_texture(index, width, height, data);
                         }
                         Err(err) => {
-                            let err = format!("Failed to open texture: {}", err);
+                            log::error!("{}", format!("Failed to open texture: {}", err));
 
-                            log::error!("{}", err);
-                            self.change_status(AppStatus::Error(err));
+                            self.change_status(AppStatus::Error(format!(
+                                "{}: {}",
+                                fl!("status_err_open_texture"),
+                                err
+                            )));
                         }
                     }
                 }
@@ -190,10 +193,13 @@ impl Core {
                         response.set_title = Some(format_title(&self.wgs_path));
                     }
                     Err(err) => {
-                        let err = format!("Failed to open example: {}", err);
+                        log::error!("{}", format!("Failed to open example: {}", err));
 
-                        log::error!("{}", err);
-                        self.change_status(AppStatus::Error(err));
+                        self.change_status(AppStatus::Error(format!(
+                            "{}: {}",
+                            fl!("status_err_open_example"),
+                            err
+                        )));
                     }
                 }
             }
@@ -210,10 +216,13 @@ impl Core {
                             response.set_title = Some(format_title(&self.wgs_path));
                         }
                         Err(err) => {
-                            let err = format!("Failed to open file: {}", err);
+                            log::error!("{}", format!("Failed to open file: {}", err));
 
-                            log::error!("{}", err);
-                            self.change_status(AppStatus::Error(err));
+                            self.change_status(AppStatus::Error(format!(
+                                "{}: {}",
+                                fl!("status_err_open_file"),
+                                err
+                            )));
                         }
                     }
                 }
@@ -226,10 +235,13 @@ impl Core {
                             self.runtime.add_texture(width, height, data);
                         }
                         Err(err) => {
-                            let err = format!("Failed to open texture: {}", err);
+                            log::error!("{}", format!("Failed to open texture: {}", err));
 
-                            log::error!("{}", err);
-                            self.change_status(AppStatus::Error(err));
+                            self.change_status(AppStatus::Error(format!(
+                                "{}: {}",
+                                fl!("status_err_open_texture"),
+                                err
+                            )));
                         }
                     }
                 }
@@ -272,7 +284,7 @@ impl Core {
 
             match result {
                 Ok(()) => {
-                    self.change_status(AppStatus::Info("Shader compiled successfully!".to_owned()));
+                    self.change_status(AppStatus::Info(fl!("status_compile_ok")));
 
                     response.request_redraw = true;
                 }
@@ -301,7 +313,7 @@ impl Core {
                 log::error!("Validation error: {:?}", description);
             }
 
-            self.change_status(AppStatus::Error("Shader validation error".to_string()));
+            self.change_status(AppStatus::Error(fl!("status_err_valid")));
         }
 
         if let Err(error) = self.render(window) {
@@ -513,7 +525,7 @@ impl Core {
         if self.wgs_path.is_some() {
             save_wgs(&self.wgs_path.as_ref().unwrap(), &wgs);
 
-            self.change_status(AppStatus::Info("Shader saved successfully!".to_owned()));
+            self.change_status(AppStatus::Info(fl!("status_save_ok")));
 
             Some(format_title(&self.wgs_path))
         } else {
