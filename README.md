@@ -58,10 +58,9 @@ You can find examples in [wgs's repo](https://github.com/fralonra/wgs/tree/maste
 - The amount of the texture you can upload is [the max bind group count of your device](https://docs.rs/wgpu/latest/wgpu/struct.Limits.html#structfield.max_bind_groups) - 1.
 - Won't show any hints on invalid shaders. They just won't compile.
 
-## Todos
+## Contributing
 
-- Web version
-- Advanced shader validation (detailed in https://github.com/fralonra/wgshadertoy/issues/1)
+- [Translations](./i18n/README.md)
 
 ## Credits
 

@@ -13,7 +13,7 @@ use std::fs::read;
 // allowing them to load first to reduce the total number of fonts loaded.
 //
 // If you find that a certain language cannot be displayed
-// correctly on your device, please submit feedback: https://github.com/fralonra/wgshadertoy/issues/7”
+// correctly on your device, please submit feedback: https://github.com/fralonra/wgshadertoy/issues/7
 const FONTS_MAP: [(&str, &[&str]); 4] = [
     (
         "Arabic",
