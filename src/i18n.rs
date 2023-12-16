@@ -7,6 +7,15 @@ use i18n_embed::{
 use lazy_static::lazy_static;
 use rust_embed::RustEmbed;
 
+macro_rules! lang {
+    ($id:tt, $label:tt) => {
+        Language {
+            id: $id,
+            label: $label,
+        }
+    };
+}
+
 #[derive(RustEmbed)]
 #[folder = "i18n/"]
 struct Localizations;
@@ -26,56 +35,22 @@ pub struct Language {
     pub label: &'static str,
 }
 
-pub const LANGUAGES: [Language; 12] = [
-    Language {
-        id: "ar",
-        label: "العربية (Arabic)",
-    },
-    Language {
-        id: "de",
-        label: "Deutsch (German)",
-    },
-    Language {
-        id: "en",
-        label: "English (English)",
-    },
-    Language {
-        id: "es",
-        label: "Español (Spanish)",
-    },
-    Language {
-        id: "fr",
-        label: "Français (French)",
-    },
-    Language {
-        id: "it",
-        label: "Italiano (Italian)",
-    },
-    Language {
-        id: "ja",
-        label: "日本語 (Japanese)",
-    },
-    Language {
-        id: "ko",
-        label: "한국어 (Korean)",
-    },
-    Language {
-        id: "pt",
-        label: "Português (Portuguese)",
-    },
-    Language {
-        id: "ru",
-        label: "Русский (Russian)",
-    },
-    Language {
-        id: "zh_CN",
-        label: "简体中文 (Simplified Chinese)",
-    },
-    Language {
-        id: "zh_TW",
-        label: "繁體中文 (Traditional Chinese)",
-    },
-];
+const_array!(
+    pub LANGUAGES: Language [
+        lang!("ar", "العربية (Arabic)"),
+        lang!("de", "Deutsch (German)"),
+        lang!("en", "English (English)"),
+        lang!("es", "Español (Spanish)"),
+        lang!("fr", "Français (French)"),
+        lang!("it", "Italiano (Italian)"),
+        lang!("ja", "日本語 (Japanese)"),
+        lang!("ko", "한국어 (Korean)"),
+        lang!("pt", "Português (Portuguese)"),
+        lang!("ru", "Русский (Russian)"),
+        lang!("zh_CN", "简体中文 (Simplified Chinese)"),
+        lang!("zh_TW", "繁體中文 (Traditional Chinese)")
+    ]
+);
 
 pub fn select_locales(request_languages: &[&'static str]) -> Result<()> {
     let requested_languages: Vec<LanguageIdentifier> = request_languages
