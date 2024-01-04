@@ -176,7 +176,7 @@ impl Core {
 
                 update_result = Some(self.runtime.load(wgs));
 
-                response.set_title = Some(format_title(&self.wgs_path));
+                response.set_title = Some(self.format_title());
             }
             UserEvent::OpenAbout => {
                 response.request_open_about = true;
@@ -192,7 +192,7 @@ impl Core {
 
                         update_result = Some(self.runtime.load(wgs));
 
-                        response.set_title = Some(format_title(&self.wgs_path));
+                        response.set_title = Some(self.format_title());
                     }
                     Err(err) => {
                         log::error!("{}", format!("Failed to open example: {}", err));
@@ -215,7 +215,7 @@ impl Core {
 
                             update_result = Some(self.runtime.load(wgs));
 
-                            response.set_title = Some(format_title(&self.wgs_path));
+                            response.set_title = Some(self.format_title());
                         }
                         Err(err) => {
                             log::error!("{}", format!("Failed to open file: {}", err));
@@ -356,10 +356,18 @@ impl Core {
         }
     }
 
+    pub fn window_title(&self) -> String {
+        self.format_title()
+    }
+
     fn change_status(&mut self, status: AppStatus) {
         self.status = status;
 
         self.status_clock = Instant::now();
+    }
+
+    fn format_title(&self) -> String {
+        format!("[{}] - WgShadertoy", self.runtime.wgs().name())
     }
 
     fn load_wgs(&mut self, wgs: &WgsData) {
@@ -538,21 +546,11 @@ impl Core {
 
             self.change_status(AppStatus::Info(fl!("status_save_ok")));
 
-            Some(format_title(&self.wgs_path))
+            Some(self.format_title())
         } else {
             None
         }
     }
-}
-
-pub fn format_title(file_path: &Option<PathBuf>) -> String {
-    format!(
-        "[{}] - WgShadertoy",
-        match file_path {
-            Some(file_path) => file_path.display().to_string(),
-            None => "Untitled".to_owned(),
-        }
-    )
 }
 
 fn load_wgs_from_buffer(buffer: &[u8]) -> io::Result<WgsData> {

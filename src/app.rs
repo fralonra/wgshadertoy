@@ -1,10 +1,6 @@
 use crate::{
-    about::AboutWindow,
-    core::{format_title, Core},
-    event::UserEvent,
-    i18n::select_system_locales,
-    window::WindowExt,
-    window_icon::window_icon,
+    about::AboutWindow, core::Core, event::UserEvent, i18n::select_system_locales,
+    window::WindowExt, window_icon::window_icon,
 };
 use anyhow::Result;
 use std::collections::HashMap;
@@ -34,7 +30,6 @@ impl App {
         let window = WindowBuilder::new()
             .with_min_inner_size(Size::Logical(LogicalSize::new(720.0, 360.0)))
             .with_inner_size(RECOMMAND_SIZE)
-            .with_title(format_title(&None))
             .with_window_icon(window_icon())
             .build(&event_loop)?;
 
@@ -49,6 +44,8 @@ impl App {
             inner_size.height as f32,
             window.scale_factor() as f32,
         )?;
+
+        window.set_title(&core.window_title());
 
         select_system_locales()?;
 
