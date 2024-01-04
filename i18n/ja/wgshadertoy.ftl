@@ -11,6 +11,7 @@ menu_quit = 終了
 menu_preferences = 設定
 menu_languages = 言語
 menu_language_system = システムデフォルト
+menu_record_fps = FPSを記録する
 ## Menu Help
 menu_help = ヘルプ
 menu_about = このプログラムについて

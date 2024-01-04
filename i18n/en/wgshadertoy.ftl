@@ -11,6 +11,7 @@ menu_quit = Quit
 menu_preferences = Preferences
 menu_languages = Languages
 menu_language_system = System Default
+menu_record_fps = Record FPS
 ## Menu Help
 menu_help = Help
 menu_about = About

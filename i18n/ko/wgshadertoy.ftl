@@ -11,6 +11,7 @@ menu_quit = 종료
 menu_preferences = 환경 설정
 menu_languages = 언어
 menu_language_system = 시스템 기본값
+menu_record_fps = FPS 기록
 ## Menu Help
 menu_help = 도움말
 menu_about = 소개

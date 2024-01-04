@@ -10,10 +10,10 @@ mod egui_winit_wgpu_context;
 mod event;
 mod example;
 mod fonts;
-#[cfg(feature = "fps")]
 mod fps_counter;
 mod fs;
 mod i18n;
+mod preferences;
 mod shortcut;
 mod ui;
 mod window;

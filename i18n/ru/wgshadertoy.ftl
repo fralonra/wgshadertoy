@@ -11,6 +11,7 @@ menu_quit = Выйти
 menu_preferences = Настройки
 menu_languages = Языки
 menu_language_system = Системный
+menu_record_fps = Запись кадров в секунду
 ## Menu Help
 menu_help = Помощь
 menu_about = О программе

@@ -7,6 +7,7 @@ use crate::{
     example::Example,
     fonts::{load_font, load_system_font},
     i18n::{select_locales, select_system_locales, LANGUAGES},
+    preferences::Preferences,
     shortcut::Shortcut,
 };
 use egui::{
@@ -74,12 +75,13 @@ impl Ui {
     pub fn prepare(
         &mut self,
         raw_input: RawInput,
+        preferences: &mut Preferences,
         edit_context: &mut EditContext,
         event_proxy: &impl EventProxy<UserEvent>,
         state: UiState,
     ) -> FullOutput {
         self.context.run(raw_input, |ctx| {
-            self.ui(ctx, edit_context, event_proxy, state);
+            self.ui(ctx, preferences, edit_context, event_proxy, state);
         })
     }
 
@@ -94,6 +96,7 @@ impl Ui {
     fn ui(
         &self,
         ctx: &Context,
+        preferences: &mut Preferences,
         edit_context: &mut EditContext,
         event_proxy: &impl EventProxy<UserEvent>,
         state: UiState,
@@ -247,6 +250,15 @@ impl Ui {
                             }
                         }
                     });
+
+                    ui.separator();
+
+                    if ui
+                        .checkbox(&mut preferences.record_fps, fl!("menu_record_fps"))
+                        .clicked()
+                    {
+                        ui.close_menu();
+                    }
                 });
 
                 ui.menu_button(fl!("menu_help"), |ui| {
@@ -259,31 +271,41 @@ impl Ui {
             });
         });
 
-        TopBottomPanel::bottom("status").show(ctx, |ui| match state.status {
-            AppStatus::Info(message) => {
-                ui.label(message);
-            }
-            AppStatus::Warning(message) => {
-                ui.colored_label(
-                    if is_dark {
-                        Color32::KHAKI
-                    } else {
-                        Color32::DARK_RED
-                    },
-                    message,
-                );
-            }
-            AppStatus::Error(message) => {
-                ui.colored_label(
-                    if is_dark {
-                        Color32::LIGHT_RED
-                    } else {
-                        Color32::DARK_RED
-                    },
-                    message,
-                );
-            }
-            _ => {}
+        TopBottomPanel::bottom("status").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                if let Some(fps) = state.fps {
+                    ui.label(format!("{}fps", fps));
+
+                    ui.separator();
+                }
+
+                match state.status {
+                    AppStatus::Info(message) => {
+                        ui.label(message);
+                    }
+                    AppStatus::Warning(message) => {
+                        ui.colored_label(
+                            if is_dark {
+                                Color32::KHAKI
+                            } else {
+                                Color32::DARK_RED
+                            },
+                            message,
+                        );
+                    }
+                    AppStatus::Error(message) => {
+                        ui.colored_label(
+                            if is_dark {
+                                Color32::LIGHT_RED
+                            } else {
+                                Color32::DARK_RED
+                            },
+                            message,
+                        );
+                    }
+                    _ => {}
+                }
+            });
         });
 
         CentralPanel::default().show(ctx, |ui| {
@@ -401,6 +423,7 @@ impl Ui {
 pub struct UiState {
     pub can_capture: bool,
     pub file_saved: bool,
+    pub fps: Option<usize>,
     pub is_paused: bool,
     pub status: AppStatus,
     pub texture_addable: bool,

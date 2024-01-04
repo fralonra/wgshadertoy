@@ -11,6 +11,7 @@ menu_quit = خروج
 menu_preferences = التفضيلات
 menu_languages = اللغات
 menu_language_system = النظام الافتراضي
+menu_record_fps = سجل إطارا في الثانية
 ## Menu Help
 menu_help = مساعدة
 menu_about = حول

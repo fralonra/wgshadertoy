@@ -1,8 +1,8 @@
-#[cfg(feature = "fps")]
-use crate::fps_counter::FpsCounter;
 use crate::{
     event::{AppResponse, AppStatus, EventProxyWinit, UserEvent},
+    fps_counter::FpsCounter,
     fs::{create_file, select_file, select_texture, write_file},
+    preferences::Preferences,
     ui::{EditContext, Ui, UiState},
 };
 use anyhow::{bail, Result};
@@ -23,9 +23,10 @@ use winit::{event::WindowEvent, event_loop::EventLoop, window::Window};
 pub struct Core {
     cursor: [f32; 2],
     event_proxy: EventProxyWinit<UserEvent>,
-    #[cfg(feature = "fps")]
+    fps: Option<usize>,
     fps_counter: FpsCounter,
     has_validation_error: bool,
+    preferences: Preferences,
     runtime: Runtime,
     size: (f32, f32),
     state: State,
@@ -82,12 +83,13 @@ impl Core {
         let initial_status = AppStatus::Info("Shader compiled successfully!".to_owned());
 
         Ok(Self {
-            cursor: Default::default(),
+            cursor: [0.0, 0.0],
             event_proxy,
-            #[cfg(feature = "fps")]
+            fps: None,
             fps_counter: FpsCounter::new(),
             has_validation_error: false,
             runtime,
+            preferences: Preferences::default(),
             size: (width, height),
             state,
             status: initial_status,
@@ -327,8 +329,15 @@ impl Core {
             }
         }
 
-        #[cfg(feature = "fps")]
-        log::info!("FPS: {}", self.fps_counter.tick());
+        if self.preferences.record_fps {
+            let fps = self.fps_counter.tick();
+
+            log::info!("FPS: {}", fps);
+
+            self.fps = Some(fps);
+        } else if self.fps.is_some() {
+            self.fps = None;
+        }
     }
 
     pub fn resize(&mut self, width: f32, height: f32, scale_factor: f32) {
@@ -386,6 +395,7 @@ impl Core {
             let ui_state = UiState {
                 can_capture: self.runtime.is_capture_supported(),
                 file_saved: self.wgs_path.is_some(),
+                fps: self.fps,
                 is_paused: self.runtime.is_paused(),
                 status: self.status.clone(),
                 texture_addable: self.runtime.wgs().textures_ref().len() + 1
@@ -396,6 +406,7 @@ impl Core {
 
             let full_output = self.ui.prepare(
                 raw_input,
+                &mut self.preferences,
                 &mut self.ui_edit_context,
                 &self.event_proxy,
                 ui_state,

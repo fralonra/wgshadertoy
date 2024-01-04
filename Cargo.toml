@@ -4,8 +4,6 @@ name = "wgshadertoy"
 version = "0.3.2"
 homepage = "https://github.com/fralonra/wgshadertoy"
 
-[features]
-fps = []
 
 [dependencies]
 anyhow = "1.0"
@@ -15,7 +13,10 @@ egui-winit = "0.23"
 env_logger = "0.9"
 font-kit = "0.11"
 futures = "0.3"
-i18n-embed = { version = "0.14", features = ["fluent-system", "desktop-requester"] }
+i18n-embed = { version = "0.14", features = [
+    "fluent-system",
+    "desktop-requester",
+] }
 i18n-embed-fl = "0.7"
 image = "0.24"
 lazy_static = "1.4"
