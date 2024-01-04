@@ -547,7 +547,7 @@ impl Core {
 
 pub fn format_title(file_path: &Option<PathBuf>) -> String {
     format!(
-        "WgShadertoy - {}",
+        "[{}] - WgShadertoy",
         match file_path {
             Some(file_path) => file_path.display().to_string(),
             None => "Untitled".to_owned(),
