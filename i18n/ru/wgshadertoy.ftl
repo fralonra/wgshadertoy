@@ -11,6 +11,9 @@ menu_quit = Выйти
 menu_preferences = Настройки
 menu_languages = Языки
 menu_language_system = Системный
+menu_theme = Тема
+menu_theme_light = Светлая
+menu_theme_dark = Темная
 menu_record_fps = Запись кадров в секунду
 ## Menu Help
 menu_help = Помощь

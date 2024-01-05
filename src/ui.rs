@@ -7,13 +7,13 @@ use crate::{
     example::Example,
     fonts::{load_font, load_system_font},
     i18n::{select_locales, select_system_locales, LANGUAGES},
-    preferences::Preferences,
+    preferences::{Preferences, Theme},
     shortcut::Shortcut,
 };
 use egui::{
-    menu, style::FontSelection, widgets, Align, Button, CentralPanel, Color32, ColorImage, Context,
+    menu, style::FontSelection, Align, Button, CentralPanel, Color32, ColorImage, Context,
     FontData, FontDefinitions, FullOutput, Layout, RawInput, ScrollArea, TextEdit, TextureHandle,
-    TextureOptions, TopBottomPanel,
+    TextureOptions, TopBottomPanel, Visuals,
 };
 use highlight::{CodeTheme, Highlighter};
 use image_upload::ImageUpload;
@@ -130,7 +130,14 @@ impl Ui {
             ui.fonts(|f| f.layout_job(layout_job))
         };
 
-        let is_dark = ctx.style().visuals.dark_mode;
+        let is_dark = preferences.theme == Theme::Dark;
+        if ctx.style().visuals.dark_mode != is_dark {
+            ctx.set_visuals(if is_dark {
+                Visuals::dark()
+            } else {
+                Visuals::light()
+            });
+        }
 
         TopBottomPanel::top("menu").show(ctx, |ui| {
             menu::bar(ui, |ui| {
@@ -253,6 +260,30 @@ impl Ui {
 
                     ui.separator();
 
+                    ui.menu_button(fl!("menu_theme"), |ui| {
+                        if ui
+                            .radio_value(
+                                &mut preferences.theme,
+                                Theme::Light,
+                                fl!("menu_theme_light"),
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+
+                        if ui
+                            .radio_value(
+                                &mut preferences.theme,
+                                Theme::Dark,
+                                fl!("menu_theme_dark"),
+                            )
+                            .clicked()
+                        {
+                            ui.close_menu();
+                        }
+                    });
+
                     if ui
                         .checkbox(&mut preferences.record_fps, fl!("menu_record_fps"))
                         .clicked()
@@ -360,10 +391,6 @@ impl Ui {
                         UserEvent::Pause
                     });
                 }
-
-                ui.separator();
-
-                widgets::global_dark_light_mode_buttons(ui);
             });
 
             ui.horizontal_wrapped(|ui| {

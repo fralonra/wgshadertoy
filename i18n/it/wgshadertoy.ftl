@@ -11,6 +11,9 @@ menu_quit = Esci
 menu_preferences = Preferenze
 menu_languages = Lingue
 menu_language_system = Predefinito del sistema
+menu_theme = Tema
+menu_theme_light = Chiaro
+menu_theme_dark = Scuro
 menu_record_fps = Registra FPS
 ## Menu Help
 menu_help = Aiuto

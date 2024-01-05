@@ -11,6 +11,9 @@ menu_quit = 退出
 menu_preferences = 首选项
 menu_languages = 语言
 menu_language_system = 系统语言
+menu_theme = 主题
+menu_theme_light = 浅色
+menu_theme_dark = 深色
 menu_record_fps = 记录 FPS
 # Menu Help
 menu_help = 帮助

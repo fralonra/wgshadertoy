@@ -11,6 +11,9 @@ menu_quit = خروج
 menu_preferences = التفضيلات
 menu_languages = اللغات
 menu_language_system = النظام الافتراضي
+menu_theme = السمة
+menu_theme_light = فاتح
+menu_theme_dark = غامق
 menu_record_fps = سجل إطارا في الثانية
 ## Menu Help
 menu_help = مساعدة

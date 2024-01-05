@@ -11,6 +11,9 @@ menu_quit = 종료
 menu_preferences = 환경 설정
 menu_languages = 언어
 menu_language_system = 시스템 기본값
+menu_theme = 테마
+menu_theme_light = 밝은
+menu_theme_dark = 어두운
 menu_record_fps = FPS 기록
 ## Menu Help
 menu_help = 도움말
