@@ -158,7 +158,9 @@ impl App {
                     }
 
                     if response.request_open_about {
-                        if let Ok(sub_window) = AboutWindow::new(event_loop, None) {
+                        if let Ok(sub_window) =
+                            AboutWindow::new(event_loop, None, self.core.preferences().theme)
+                        {
                             self.sub_window_map
                                 .insert(sub_window.window_id(), Box::new(sub_window));
                         }

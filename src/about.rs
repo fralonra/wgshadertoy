@@ -1,9 +1,9 @@
 use crate::{
     egui_winit_wgpu_context::EguiWinitWgpuContext, event::UserEvent, fonts::load_system_font,
-    window::WindowExt, window_icon::window_icon,
+    preferences::Theme, window::WindowExt, window_icon::window_icon,
 };
 use anyhow::Result;
-use egui::{pos2, vec2, CentralPanel, Context, FontDefinitions, Rect};
+use egui::{pos2, vec2, CentralPanel, Context, FontDefinitions, Rect, Visuals};
 use raw_window_handle::RawWindowHandle;
 use std::env;
 use winit::{
@@ -24,6 +24,7 @@ impl WindowExt<UserEvent> for AboutWindow {
     fn new(
         event_loop: &EventLoopWindowTarget<UserEvent>,
         parent: Option<RawWindowHandle>,
+        theme: Theme,
     ) -> Result<Self> {
         let mut builder = WindowBuilder::new()
             .with_title("About")
@@ -37,7 +38,18 @@ impl WindowExt<UserEvent> for AboutWindow {
 
         let mut context = EguiWinitWgpuContext::new(&window, event_loop)?;
 
-        setup_fonts(context.context_mut());
+        let mut egui_ctx = context.context_mut();
+
+        let is_dark = theme == Theme::Dark;
+        if egui_ctx.style().visuals.dark_mode != is_dark {
+            egui_ctx.set_visuals(if is_dark {
+                Visuals::dark()
+            } else {
+                Visuals::light()
+            });
+        }
+
+        setup_fonts(&mut egui_ctx);
 
         Ok(Self { context, window })
     }

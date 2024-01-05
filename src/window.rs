@@ -1,9 +1,14 @@
+use crate::preferences::Theme;
 use anyhow::Result;
 use raw_window_handle::RawWindowHandle;
 use winit::{event::WindowEvent, event_loop::EventLoopWindowTarget, window::WindowId};
 
 pub trait WindowExt<E> {
-    fn new(event_loop: &EventLoopWindowTarget<E>, parent: Option<RawWindowHandle>) -> Result<Self>
+    fn new(
+        event_loop: &EventLoopWindowTarget<E>,
+        parent: Option<RawWindowHandle>,
+        theme: Theme,
+    ) -> Result<Self>
     where
         Self: Sized;
 

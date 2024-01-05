@@ -303,6 +303,10 @@ impl Core {
         self.state.on_event(self.ui.context(), event).repaint
     }
 
+    pub fn preferences(&self) -> &Preferences {
+        &self.preferences
+    }
+
     pub fn redraw(&mut self, window: &Window) {
         if self.status_clock.elapsed().as_secs() > 5 {
             self.status = AppStatus::Idle;
