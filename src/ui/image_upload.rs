@@ -44,91 +44,92 @@ impl<'a> Widget for ImageUpload<'a> {
                     Stroke::new(self.rounding.min(self.size * 0.5), ui.visuals().window_fill),
                 );
 
-                if self.editable || self.removable {
-                    if ui.rect_contains_pointer(rect) {
-                        ui.put(rect, |ui: &mut Ui| {
-                            ui.painter().rect_filled(
-                                rect,
-                                self.rounding,
-                                Color32::from_rgba_premultiplied(20, 20, 20, 180),
+                let editable = self.editable;
+                let removable = self.removable;
+                let contains_pointer = ui.rect_contains_pointer(rect);
+
+                if (editable || removable) && contains_pointer {
+                    ui.put(rect, |ui: &mut Ui| {
+                        ui.painter().rect_filled(
+                            rect,
+                            self.rounding,
+                            Color32::from_rgba_premultiplied(20, 20, 20, 180),
+                        );
+
+                        let mut content_size = Vec2::default();
+                        let button_padding = ui.spacing().button_padding;
+
+                        if self.editable {
+                            let (_text, size) = layout_text_widget(
+                                ui,
+                                icon_to_char(Icon::Edit).to_string(),
+                                button_padding,
                             );
 
-                            let mut content_size = Vec2::default();
-                            let button_padding = ui.spacing().button_padding;
+                            content_size += size;
+                        }
 
-                            if self.editable {
-                                let (_text, size) = layout_text_widget(
-                                    ui,
-                                    icon_to_char(Icon::Edit).to_string(),
-                                    button_padding,
-                                );
-
-                                content_size += size;
-                            }
-
-                            if self.removable {
-                                let (_text, size) = layout_text_widget(
-                                    ui,
-                                    icon_to_char(Icon::Delete).to_string(),
-                                    button_padding,
-                                );
-
-                                content_size += size;
-                            }
-
-                            let button_count = if self.editable && self.removable {
-                                2.0
-                            } else {
-                                1.0
-                            };
-
-                            let item_spacing = ui.spacing().item_spacing;
-                            let content_size = vec2(
-                                content_size[0] + (button_count - 1.0) * item_spacing.x,
-                                content_size[1],
+                        if self.removable {
+                            let (_text, size) = layout_text_widget(
+                                ui,
+                                icon_to_char(Icon::Delete).to_string(),
+                                button_padding,
                             );
 
-                            let content_rect = Rect::from_center_size(rect.center(), content_size);
+                            content_size += size;
+                        }
 
-                            ui.allocate_ui_at_rect(content_rect, |ui| {
-                                ui.horizontal_centered(|ui| {
-                                    if self.editable {
-                                        let resp = ui.button(icon_to_char(Icon::Edit).to_string());
+                        let button_count = if self.editable && self.removable {
+                            2.0
+                        } else {
+                            1.0
+                        };
 
-                                        let resp = if !self.edit_hint.is_empty() {
-                                            resp.on_hover_text(self.edit_hint)
-                                        } else {
-                                            resp
-                                        };
+                        let item_spacing = ui.spacing().item_spacing;
+                        let content_size = vec2(
+                            content_size[0] + (button_count - 1.0) * item_spacing.x,
+                            content_size[1],
+                        );
 
-                                        if resp.clicked() {
-                                            if let Some(on_edit) = self.on_edit {
-                                                on_edit();
-                                            }
+                        let content_rect = Rect::from_center_size(rect.center(), content_size);
+
+                        ui.allocate_ui_at_rect(content_rect, |ui| {
+                            ui.horizontal_centered(|ui| {
+                                if self.editable {
+                                    let resp = ui.button(icon_to_char(Icon::Edit).to_string());
+
+                                    let resp = if !self.edit_hint.is_empty() {
+                                        resp.on_hover_text(self.edit_hint)
+                                    } else {
+                                        resp
+                                    };
+
+                                    if resp.clicked() {
+                                        if let Some(on_edit) = self.on_edit {
+                                            on_edit();
                                         }
                                     }
+                                }
 
-                                    if self.removable {
-                                        let resp =
-                                            ui.button(icon_to_char(Icon::Delete).to_string());
+                                if self.removable {
+                                    let resp = ui.button(icon_to_char(Icon::Delete).to_string());
 
-                                        let resp = if !self.remove_hint.is_empty() {
-                                            resp.on_hover_text(self.remove_hint)
-                                        } else {
-                                            resp
-                                        };
+                                    let resp = if !self.remove_hint.is_empty() {
+                                        resp.on_hover_text(self.remove_hint)
+                                    } else {
+                                        resp
+                                    };
 
-                                        if resp.clicked() {
-                                            if let Some(on_remove) = self.on_remove {
-                                                on_remove();
-                                            }
+                                    if resp.clicked() {
+                                        if let Some(on_remove) = self.on_remove {
+                                            on_remove();
                                         }
                                     }
-                                });
-                            })
-                            .response
-                        });
-                    }
+                                }
+                            });
+                        })
+                        .response
+                    });
                 }
             }
             None => {
@@ -156,6 +157,11 @@ impl<'a> Widget for ImageUpload<'a> {
     }
 }
 
+// WHY DO I NEED TO DO THIS??? They're public functions
+//
+// Anyways I do, if you make changes to this implementation make sure to remove this before you
+// compile to check for any warnings
+#[allow(dead_code)]
 impl<'a> ImageUpload<'a> {
     pub fn new(texture_id: Option<TextureId>) -> Self {
         Self {

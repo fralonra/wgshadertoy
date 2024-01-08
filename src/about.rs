@@ -38,7 +38,7 @@ impl WindowExt<UserEvent> for AboutWindow {
 
         let mut context = EguiWinitWgpuContext::new(&window, event_loop)?;
 
-        let mut egui_ctx = context.context_mut();
+        let egui_ctx = context.context_mut();
 
         let is_dark = theme == Theme::Dark;
         if egui_ctx.style().visuals.dark_mode != is_dark {
@@ -49,7 +49,7 @@ impl WindowExt<UserEvent> for AboutWindow {
             });
         }
 
-        setup_fonts(&mut egui_ctx);
+        setup_fonts(egui_ctx);
 
         Ok(Self { context, window })
     }

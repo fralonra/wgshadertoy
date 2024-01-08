@@ -51,7 +51,7 @@ impl Ui {
             "debug",
             Arc::new(ColorImage::from_rgba_unmultiplied(
                 [width as usize, height as usize],
-                &data,
+                data,
             )),
             TextureOptions::LINEAR,
         ));
@@ -62,7 +62,7 @@ impl Ui {
             "debug",
             Arc::new(ColorImage::from_rgba_unmultiplied(
                 [width as usize, height as usize],
-                &data,
+                data,
             )),
             TextureOptions::LINEAR,
         );
@@ -86,7 +86,7 @@ impl Ui {
     }
 
     pub fn remove_texture(&mut self, index: usize) {
-        self.textures.remove(index);
+        let _ = self.textures.remove(index);
     }
 
     pub fn reset_textures(&mut self) {
@@ -239,7 +239,11 @@ impl Ui {
                         ui.set_width(250.0);
 
                         if ui.button(fl!("menu_language_system")).clicked() {
-                            select_system_locales();
+                            // Not sure if unwrap is the best idea here, but I don't know enough
+                            // about the app to say other wise
+                            //
+                            // Feel free to replace
+                            select_system_locales().unwrap();
 
                             ui.close_menu();
                         }
@@ -251,7 +255,11 @@ impl Ui {
                                 .button(format!("{} [{}]", language.label, language.id))
                                 .clicked()
                             {
-                                select_locales(&[language.id]);
+                                // Not sure if unwrap is the best idea here, but I don't know enough
+                                // about the app to say other wise
+                                //
+                                // Feel free to replace
+                                select_locales(&[language.id]).unwrap();
 
                                 ui.close_menu();
                             }
@@ -349,13 +357,7 @@ impl Ui {
                     .clicked()
                 {
                     event_proxy.send_event(UserEvent::RequestRedraw);
-                }
-                if state.can_capture {
-                    if ui
-                        .button(icon_to_char(Icon::ScreenshotMonitor).to_string())
-                        .on_hover_text(fl!("control_capture"))
-                        .clicked()
-                    {
+                    if state.can_capture {
                         event_proxy.send_event(UserEvent::CaptureImage);
                     }
                 }

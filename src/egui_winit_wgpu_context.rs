@@ -14,7 +14,7 @@ impl EguiWinitWgpuContext {
     pub fn new<T>(window: &Window, event_loop: &EventLoopWindowTarget<T>) -> Result<Self> {
         let mut painter = Painter::new(WgpuConfiguration::default(), 1, None, true);
 
-        futures::executor::block_on(painter.set_window(Some(&window)))?;
+        futures::executor::block_on(painter.set_window(Some(window)))?;
 
         let mut state = State::new(&event_loop);
         state.set_pixels_per_point(window.scale_factor() as f32);

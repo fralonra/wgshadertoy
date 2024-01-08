@@ -133,7 +133,7 @@ impl Core {
                         .wgs()
                         .name()
                         .to_ascii_lowercase()
-                        .replace(" ", "_"),
+                        .replace(' ', "_"),
                     "png"
                 );
                 self.runtime.request_capture_image(
@@ -184,7 +184,7 @@ impl Core {
             UserEvent::OpenExample(example) => {
                 let bytes = example.data();
 
-                match load_wgs_from_buffer(&bytes) {
+                match load_wgs_from_buffer(bytes) {
                     Ok(wgs) => {
                         self.wgs_path = None;
 
@@ -446,7 +446,7 @@ impl Core {
 
             self.runtime.render_with(|device, queue, view| {
                 for (id, delta) in &full_output.textures_delta.set {
-                    self.ui_renderer.update_texture(device, queue, *id, &delta);
+                    self.ui_renderer.update_texture(device, queue, *id, delta);
                 }
 
                 let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -524,7 +524,7 @@ impl Core {
             // Save as.
             if let Some(path) = create_file(&format!(
                 "{}.{}",
-                wgs.name().to_ascii_lowercase().replace(" ", "_"),
+                wgs.name().to_ascii_lowercase().replace(' ', "_"),
                 wgs_core::EXTENSION
             )) {
                 self.wgs_path = Some(path);
@@ -540,13 +540,13 @@ impl Core {
                     .wgs()
                     .name()
                     .to_ascii_lowercase()
-                    .replace(" ", "_"),
+                    .replace(' ', "_"),
                 wgs_core::EXTENSION
             ));
         }
 
         if self.wgs_path.is_some() {
-            save_wgs(&self.wgs_path.as_ref().unwrap(), &wgs);
+            save_wgs(self.wgs_path.as_ref().unwrap(), wgs);
 
             self.change_status(AppStatus::Info(fl!("status_save_ok")));
 

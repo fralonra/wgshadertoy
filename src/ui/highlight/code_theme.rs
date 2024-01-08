@@ -13,6 +13,11 @@ impl Default for CodeTheme {
     }
 }
 
+// WHY DO I NEED TO DO THIS??? They're public functions
+//
+// Anyways I do, if you make changes to this implementation make sure to remove this before you
+// compile to check for any warnings
+#[allow(dead_code)]
 impl CodeTheme {
     pub fn from_style(style: &Style) -> Self {
         if style.visuals.dark_mode {

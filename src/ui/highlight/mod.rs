@@ -22,7 +22,7 @@ impl Highlighter {
 
         while !text.is_empty() {
             if text.starts_with("//") {
-                let end = text.find("\n").unwrap_or(text.len());
+                let end = text.find('\n').unwrap_or(text.len());
                 job.append(&text[..end], 0.0, theme.format(TokenType::Comment));
                 text = &text[end..];
             } else if text.starts_with("/*") {
@@ -49,7 +49,7 @@ impl Highlighter {
                     .map_or_else(|| text.len(), |i| i + 1);
                 job.append(&text[..end], 0.0, theme.format(TokenType::Whitespace));
                 text = &text[end..];
-            } else if text.starts_with("@") {
+            } else if text.starts_with('@') {
                 job.append("@", 0.0, theme.format(TokenType::Literal));
                 text = &text[1..];
                 let end = text[1..]
@@ -58,7 +58,7 @@ impl Highlighter {
                 let word = &text[..end];
                 job.append(word, 0.0, theme.format(TokenType::KeywordType));
                 text = &text[end..];
-            } else if text.starts_with("<") {
+            } else if text.starts_with('<') {
                 job.append("<", 0.0, theme.format(TokenType::Literal));
                 text = &text[1..];
                 is_inside_angle_bracket = true;
