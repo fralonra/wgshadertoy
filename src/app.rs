@@ -66,10 +66,8 @@ impl App {
                 Event::RedrawRequested(window_id) => {
                     if window_id == self.window.id() {
                         self.core.redraw(&self.window);
-                    } else {
-                        if let Some(window) = self.sub_window_map.get_mut(&window_id) {
-                            window.render();
-                        }
+                    } else if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                        window.render();
                     }
                 }
                 Event::WindowEvent {
@@ -78,11 +76,9 @@ impl App {
                 } => {
                     if window_id == self.window.id() {
                         self.core.handle_window_event(event);
-                    } else {
-                        if let Some(window) = self.sub_window_map.get_mut(&window_id) {
-                            if window.handle_window_event(event) {
-                                window.request_redraw();
-                            }
+                    } else if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                        if window.handle_window_event(event) {
+                            window.request_redraw();
                         }
                     }
 
@@ -103,13 +99,11 @@ impl App {
                             }
                         }
                         WindowEvent::MouseInput { button, state, .. } => {
-                            if window_id == self.window.id() {
-                                match button {
-                                    MouseButton::Left => self
-                                        .core
-                                        .handle_mouse_input(*state == ElementState::Pressed),
-                                    _ => {}
-                                }
+                            let right_window = window_id == self.window.id();
+                            let left_pressed = matches!(button, MouseButton::Left);
+                            if right_window && left_pressed {
+                                self.core
+                                    .handle_mouse_input(*state == ElementState::Pressed);
                             }
                         }
                         WindowEvent::Resized(physical_size) => {
@@ -119,10 +113,8 @@ impl App {
                                     physical_size.height as f32,
                                     self.window.scale_factor() as f32,
                                 );
-                            } else {
-                                if let Some(window) = self.sub_window_map.get_mut(&window_id) {
-                                    window.on_resized(physical_size.width, physical_size.height);
-                                }
+                            } else if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                                window.on_resized(physical_size.width, physical_size.height);
                             }
                         }
                         WindowEvent::ScaleFactorChanged {
@@ -137,10 +129,8 @@ impl App {
                                     new_inner_size.height as f32,
                                     *scale_factor as f32,
                                 );
-                            } else {
-                                if let Some(window) = self.sub_window_map.get_mut(&window_id) {
-                                    window.on_scaled(*scale_factor as f32);
-                                }
+                            } else if let Some(window) = self.sub_window_map.get_mut(&window_id) {
+                                window.on_scaled(*scale_factor as f32);
                             }
                         }
                         _ => {}
